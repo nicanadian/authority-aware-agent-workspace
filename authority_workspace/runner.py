@@ -14,6 +14,7 @@ from authority_workspace.artifacts import build_manifest_entries, write_json, wr
 from authority_workspace.context import build_context_exposure_records
 from authority_workspace.evaluator import EVALUATOR_OUTPUT_PATHS, evaluate_run
 from authority_workspace.events import create_event
+from authority_workspace.report import REPORT_OUTPUT_PATHS, generate_report
 from authority_workspace.scenario import load_scenario
 
 
@@ -32,7 +33,7 @@ CANDIDATE_ARTIFACT_PATHS = (
     "candidate_state.jsonl",
     "candidate_state_reviews.jsonl",
 )
-RUN_ARTIFACT_PATHS = (*INITIAL_ARTIFACT_PATHS, *CANDIDATE_ARTIFACT_PATHS, *EVALUATOR_OUTPUT_PATHS)
+RUN_ARTIFACT_PATHS = (*INITIAL_ARTIFACT_PATHS, *CANDIDATE_ARTIFACT_PATHS, *EVALUATOR_OUTPUT_PATHS, *REPORT_OUTPUT_PATHS)
 
 
 def run_scenario(
@@ -62,6 +63,7 @@ def run_scenario(
     write_json(root, "run_manifest.json", manifest)
 
     evaluate_run(root)
+    generate_report(root)
 
     manifest = _manifest(scenario, scenario_file, root, run_id, RUN_ARTIFACT_PATHS)
     write_json(root, "run_manifest.json", manifest)

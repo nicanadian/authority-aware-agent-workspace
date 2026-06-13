@@ -30,7 +30,12 @@ CANDIDATE_ARTIFACTS = [
     "candidate_state.jsonl",
     "candidate_state_reviews.jsonl",
 ]
-ALL_ARTIFACTS = [*INITIAL_ARTIFACTS, *CANDIDATE_ARTIFACTS, *EVALUATOR_ARTIFACTS]
+REPORT_ARTIFACTS = [
+    "replay_timeline.jsonl",
+    "candidate_artifact.md",
+    "run_report.md",
+]
+ALL_ARTIFACTS = [*INITIAL_ARTIFACTS, *CANDIDATE_ARTIFACTS, *EVALUATOR_ARTIFACTS, *REPORT_ARTIFACTS]
 
 
 class MinimalRunnerArtifactTests(unittest.TestCase):
