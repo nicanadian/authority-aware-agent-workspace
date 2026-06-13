@@ -146,9 +146,9 @@ Consequences:
 
 ## v0 acceptance criteria
 
-- `python3 -m unittest discover -s tests -v` passes.
-- `python3 -m compileall authority_workspace` passes.
-- `python3 -m json.tool` validates all scenario and schema JSON files.
+- `python3.11 -m unittest discover -s tests -v` passes locally.
+- `python3.11 -m compileall authority_workspace` passes locally.
+- `python3.11 -m json.tool` validates all scenario and schema JSON files locally.
 - One deterministic CLI smoke writes all required artifacts into a temporary output directory.
 - Every v0 event has `grants_authority: false` and `authority_effect: "none"`.
 - Running the deterministic fixture suite writes all required artifacts.
@@ -756,8 +756,8 @@ Add fixtures one at a time with a failing test before implementation.
 **Commands:**
 
 ```bash
-python3 -m unittest tests/test_package_import.py -v
-python3 -m compileall authority_workspace
+python3.11 -m unittest tests/test_package_import.py -v
+python3.11 -m compileall authority_workspace
 ```
 
 ### Task 2: Implement canonical event envelope
