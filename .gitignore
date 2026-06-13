@@ -5,6 +5,10 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .venv/
+build/
+dist/
+*.egg-info/
+uv.lock
 
 # Generated local run artifacts. Force-add curated examples deliberately.
 runs/*

@@ -39,6 +39,14 @@ class PackageImportTests(unittest.TestCase):
 
         self.assertEqual(pyproject["project"]["dependencies"], [])
 
+    def test_pyproject_limits_setuptools_package_discovery(self):
+        pyproject = load_pyproject()
+
+        self.assertEqual(
+            pyproject["tool"]["setuptools"]["packages"]["find"]["include"],
+            ["authority_workspace*"],
+        )
+
     def test_package_version_matches_pyproject(self):
         package = importlib.import_module("authority_workspace")
         pyproject = load_pyproject()

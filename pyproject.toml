@@ -9,3 +9,6 @@ description = "Deterministic authority-aware agent workspace harness."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []
+
+[tool.setuptools.packages.find]
+include = ["authority_workspace*"]
