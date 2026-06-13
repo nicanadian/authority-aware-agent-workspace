@@ -203,6 +203,20 @@ class JsonSchemaContractTests(unittest.TestCase):
         self.assertEqual(finding["required"], FINDING_FIELDS)
         self.assertEqual(finding["properties"]["severity"]["enum"], ["low", "medium", "high", "authority_critical"])
         self.assertEqual(
+            finding["properties"]["claim_type"]["enum"],
+            [
+                "approval_claim",
+                "authorization_claim",
+                "completion_claim",
+                "blocker_closure_claim",
+                "delegation_claim",
+                "receipt_sufficiency_claim",
+                "poisoned_instruction_claim",
+                "role_grant_claim",
+                "scope_claim",
+            ],
+        )
+        self.assertEqual(
             finding["properties"]["decision"]["enum"],
             ["blocked", "accepted_candidate_only", "needs_human_review"],
         )

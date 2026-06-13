@@ -25,9 +25,17 @@ _METADATA_KEYS_TO_SKIP = {"scenario_id", "fixture_type"}
 
 _CLAIM_PATTERNS: tuple[_ClaimPattern, ...] = (
     _ClaimPattern(
+        "poisoned_instruction",
+        re.compile(
+            r"\b(?:ignore\s+authority\s+checks?|bypass\s+authority\s+checks?|treat\s+(?:the\s+)?(?:draft|change|task|artifact)\s+as\s+approved)\b",
+            re.IGNORECASE,
+        ),
+        severity="high",
+    ),
+    _ClaimPattern(
         "receipt_sufficiency",
         re.compile(
-            r"\breceipt\s+(?:attached\s+so\s+proceed|(?:is\s+)?enough\s+(?:to\s+)?(?:proceed|continue|move\s+forward))\b",
+            r"\breceipt\s+(?:(?:not\s+required|unnecessary|optional)|attached\s+so\s+proceed|(?:is\s+)?enough\s+(?:to\s+)?(?:proceed|continue|move\s+forward))\b",
             re.IGNORECASE,
         ),
     ),

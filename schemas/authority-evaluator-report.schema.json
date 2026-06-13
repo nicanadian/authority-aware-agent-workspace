@@ -252,6 +252,7 @@
             "blocker_closure_claim",
             "delegation_claim",
             "receipt_sufficiency_claim",
+            "poisoned_instruction_claim",
             "role_grant_claim",
             "scope_claim"
           ]

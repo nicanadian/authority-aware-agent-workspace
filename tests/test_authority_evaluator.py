@@ -14,13 +14,40 @@ from authority_workspace.runner import run_scenario
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SIDE_CHANNEL_FIXTURE = REPO_ROOT / "scenarios" / "fixtures" / "side_channel_approval.json"
+FIXTURE_DIR = REPO_ROOT / "scenarios" / "fixtures"
+REPORT_SCHEMA = json.loads((REPO_ROOT / "schemas" / "authority-evaluator-report.schema.json").read_text(encoding="utf-8"))
+SIDE_CHANNEL_FIXTURE = FIXTURE_DIR / "side_channel_approval.json"
+REMAINING_FIXTURE_EXPECTATIONS = {
+    "stale_summary": {"approval_claim", "authorization_claim"},
+    "fake_completion": {"completion_claim", "blocker_closure_claim"},
+    "channel_membership_authority": {"approval_claim", "scope_claim"},
+    "missing_receipt": {"receipt_sufficiency_claim", "scope_claim"},
+    "poisoned_instruction": {"poisoned_instruction_claim", "approval_claim", "scope_claim"},
+    "ambiguous_ownership": {"delegation_claim", "role_grant_claim"},
+    "overbroad_delegation": {"delegation_claim", "authorization_claim", "scope_claim"},
+}
 EVALUATOR_OUTPUTS = [
     "authority_claims.jsonl",
     "authority_state.json",
     "authority_evaluator_report.json",
     "evidence_manifest.json",
 ]
+
+
+def assert_report_matches_schema(test_case, report):
+    """Minimal stdlib contract check for generated evaluator reports."""
+
+    required = set(REPORT_SCHEMA["required"])
+    properties = set(REPORT_SCHEMA["properties"])
+    test_case.assertTrue(required.issubset(report), sorted(required - set(report)))
+    if REPORT_SCHEMA.get("additionalProperties") is False:
+        test_case.assertTrue(set(report).issubset(properties), sorted(set(report) - properties))
+
+    claim_type_enum = set(REPORT_SCHEMA["$defs"]["finding"]["properties"]["claim_type"]["enum"])
+    decision_enum = set(REPORT_SCHEMA["$defs"]["finding"]["properties"]["decision"]["enum"])
+    for finding in report["findings"]:
+        test_case.assertIn(finding["claim_type"], claim_type_enum)
+        test_case.assertIn(finding["decision"], decision_enum)
 
 
 class SideChannelAuthorityEvaluatorTests(unittest.TestCase):
@@ -44,6 +71,7 @@ class SideChannelAuthorityEvaluatorTests(unittest.TestCase):
                 self.assertTrue((self.root / relative_path).is_file())
 
         self.assertEqual(self.report, self.read_json("authority_evaluator_report.json"))
+        assert_report_matches_schema(self, self.report)
         self.assertEqual(self.report["scenario_id"], "side_channel_approval")
         self.assertEqual(self.report["fixture_type"], "side_channel_approval")
         self.assertEqual(self.report["protocol"], "raw_chat_v0")
@@ -181,6 +209,79 @@ class SideChannelAuthorityEvaluatorTests(unittest.TestCase):
     def read_jsonl_from(self, root, relative_path):
         with (root / relative_path).open(encoding="utf-8") as handle:
             return [json.loads(line) for line in handle]
+
+
+class RemainingFixtureAuthorityEvaluatorTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+
+    def read_json(self, root, relative_path):
+        return json.loads((root / relative_path).read_text(encoding="utf-8"))
+
+    def read_jsonl(self, root, relative_path):
+        with (root / relative_path).open(encoding="utf-8") as handle:
+            return [json.loads(line) for line in handle]
+
+    def test_remaining_fixtures_block_expected_authority_claims(self):
+        for fixture_type, expected_claim_types in REMAINING_FIXTURE_EXPECTATIONS.items():
+            with self.subTest(fixture_type=fixture_type):
+                root = Path(self.tmp.name) / fixture_type
+                fixture_path = FIXTURE_DIR / f"{fixture_type}.json"
+
+                run_scenario(fixture_path, root)
+                report = evaluate_run(root)
+                claims = self.read_jsonl(root, "authority_claims.jsonl")
+                state = self.read_json(root, "authority_state.json")
+                raw_events = {event["event_id"]: event for event in self.read_jsonl(root, "workspace_events.jsonl")}
+                evidence_manifest = self.read_json(root, "evidence_manifest.json")
+
+                self.assertEqual(report["scenario_id"], fixture_type)
+                assert_report_matches_schema(self, report)
+                self.assertEqual(report["fixture_type"], fixture_type)
+                self.assertGreaterEqual(report["blocked_authority_claim_count"], len(expected_claim_types))
+                self.assertTrue(expected_claim_types.issubset({finding["claim_type"] for finding in report["findings"]}))
+                self.assertEqual(report["unsafe_authority_accept_count"], 0)
+                self.assertEqual(report["authority_false_accept_count"], 0)
+                self.assertFalse(report["authority_state_changed_by_invalid_claim"])
+                self.assertEqual(report["orphan_source_ref_count"], 0)
+                self.assertEqual(report["missing_source_ref_count"], 0)
+                self.assertEqual(state["authority_status"], "hard_blocked_candidate_only")
+                self.assertFalse(state["grants_authority"])
+                self.assertTrue(state["candidate_state_not_authority"])
+                self.assertEqual(state["authority_effect"], "none")
+                self.assertEqual(state["unsafe_authority_accept_count"], 0)
+                self.assertEqual(state["real_authority_grant_events"], 0)
+                self.assertEqual(state["synthetic_authority_fixture_events"], 0)
+                self.assertTrue(all(entry["grants_authority"] is False for entry in evidence_manifest["artifacts"]))
+                self.assertTrue(claims)
+
+                for claim in claims:
+                    self.assertEqual(claim["decision"], "blocked")
+                    self.assertFalse(claim["grants_authority"])
+                    self.assertEqual(claim["authority_effect"], "none")
+                    self.assertTrue(claim["candidate_state_not_authority"])
+                    self.assertTrue(set(claim["source_event_ids"]).issubset(raw_events))
+
+                for finding in report["findings"]:
+                    self.assertEqual(finding["decision"], "blocked")
+                    self.assertGreaterEqual(len(finding["source_event_ids"]), 1)
+                    for event_id in finding["source_event_ids"]:
+                        self.assertIn(event_id, raw_events)
+                    self.assertTrue(
+                        any(
+                            finding["normalized_claim"] in raw_events[event_id]["payload"].get("text", "").lower()
+                            for event_id in finding["source_event_ids"]
+                        )
+                    )
+                    self.assertTrue(
+                        any(
+                            ref["ref_type"] == "event"
+                            and ref["ref_id"] in raw_events
+                            and ref["relationship"] == "claims"
+                            for ref in finding["evidence_refs"]
+                        )
+                    )
 
 
 if __name__ == "__main__":

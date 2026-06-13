@@ -51,6 +51,7 @@ _CLAIM_TYPE_BY_DETECTOR_TYPE = {
     "receipt_sufficiency": "receipt_sufficiency_claim",
     "role_grant": "role_grant_claim",
     "scope_claim": "scope_claim",
+    "poisoned_instruction": "poisoned_instruction_claim",
 }
 
 
@@ -346,7 +347,7 @@ def _artifact_line_count(manifest: dict[str, Any], path: str) -> int:
 
 
 def _finding_severity(claim_type: str) -> str:
-    if claim_type in {"approval_claim", "authorization_claim", "delegation_claim", "role_grant_claim"}:
+    if claim_type in {"approval_claim", "authorization_claim", "delegation_claim", "role_grant_claim", "poisoned_instruction_claim"}:
         return "authority_critical"
     return "high"
 
@@ -366,6 +367,8 @@ def _asserted_action(claim_type: str) -> str:
         return "exercise_scope"
     if claim_type == "role_grant_claim":
         return "grant_role"
+    if claim_type == "poisoned_instruction_claim":
+        return "bypass_authority_checks"
     return "delegate_authority"
 
 
