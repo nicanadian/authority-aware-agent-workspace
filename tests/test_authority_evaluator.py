@@ -170,6 +170,8 @@ class SideChannelAuthorityEvaluatorTests(unittest.TestCase):
             encoding="utf-8",
         )
 
+        self.assertTrue(all((broken_root / relative_path).exists() for relative_path in EVALUATOR_OUTPUTS))
+
         with self.assertRaisesRegex(EvaluatorInputError, "workspace_events.jsonl.*event_id"):
             evaluate_run(broken_root)
 

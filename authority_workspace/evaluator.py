@@ -57,6 +57,7 @@ def evaluate_run(run_root: str | Path) -> dict[str, Any]:
     """
 
     root = Path(run_root)
+    _remove_evaluator_outputs(root)
     manifest = _read_json(root / "run_manifest.json")
     raw_events = _read_jsonl(root / "workspace_events.jsonl")
     _validate_manifest(manifest)
@@ -82,6 +83,13 @@ def evaluate_run(run_root: str | Path) -> dict[str, Any]:
 
 def _read_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _remove_evaluator_outputs(root: Path) -> None:
+    for relative_path in EVALUATOR_OUTPUT_PATHS:
+        output_path = root / relative_path
+        if output_path.exists():
+            output_path.unlink()
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:

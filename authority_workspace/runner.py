@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from authority_workspace.artifacts import build_manifest_entries, write_json, write_jsonl
+from authority_workspace.evaluator import EVALUATOR_OUTPUT_PATHS, evaluate_run
 from authority_workspace.events import create_event
 from authority_workspace.scenario import load_scenario
 
@@ -24,6 +25,7 @@ INITIAL_ARTIFACT_PATHS = (
     "dm_messages.jsonl",
     "context_exposure.jsonl",
 )
+RUN_ARTIFACT_PATHS = (*INITIAL_ARTIFACT_PATHS, *EVALUATOR_OUTPUT_PATHS)
 
 
 def run_scenario(
@@ -44,7 +46,12 @@ def run_scenario(
     write_jsonl(root, "dm_messages.jsonl", _dm_messages(scenario, event_by_source))
     write_jsonl(root, "context_exposure.jsonl", _context_exposure(scenario, events))
 
-    manifest = _manifest(scenario, scenario_file, root, run_id)
+    manifest = _manifest(scenario, scenario_file, root, run_id, INITIAL_ARTIFACT_PATHS)
+    write_json(root, "run_manifest.json", manifest)
+
+    evaluate_run(root)
+
+    manifest = _manifest(scenario, scenario_file, root, run_id, RUN_ARTIFACT_PATHS)
     write_json(root, "run_manifest.json", manifest)
     return manifest
 
@@ -203,6 +210,7 @@ def _manifest(
     scenario_path: Path,
     output_root: Path,
     run_id: str,
+    artifact_paths: tuple[str, ...],
 ) -> dict[str, Any]:
     scenario_bytes = scenario_path.read_bytes()
     return {
@@ -216,8 +224,8 @@ def _manifest(
         "seed": scenario["seed"],
         "runner_version": RUNNER_VERSION,
         "artifact_schema_version": ARTIFACT_SCHEMA_VERSION,
-        "artifacts": build_manifest_entries(output_root, INITIAL_ARTIFACT_PATHS),
+        "artifacts": build_manifest_entries(output_root, artifact_paths),
     }
 
 
-__all__ = ["INITIAL_ARTIFACT_PATHS", "RUNNER_VERSION", "run_scenario"]
+__all__ = ["INITIAL_ARTIFACT_PATHS", "RUN_ARTIFACT_PATHS", "RUNNER_VERSION", "run_scenario"]

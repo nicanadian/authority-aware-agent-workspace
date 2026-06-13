@@ -18,6 +18,13 @@ INITIAL_ARTIFACTS = [
     "dm_messages.jsonl",
     "context_exposure.jsonl",
 ]
+EVALUATOR_ARTIFACTS = [
+    "authority_claims.jsonl",
+    "authority_state.json",
+    "authority_evaluator_report.json",
+    "evidence_manifest.json",
+]
+ALL_ARTIFACTS = [*INITIAL_ARTIFACTS, *EVALUATOR_ARTIFACTS]
 
 
 class MinimalRunnerArtifactTests(unittest.TestCase):
@@ -41,7 +48,7 @@ class MinimalRunnerArtifactTests(unittest.TestCase):
     def test_runner_writes_initial_artifacts_and_manifest(self):
         manifest = run_scenario(SIDE_CHANNEL_FIXTURE, self.root)
 
-        for relative_path in ["run_manifest.json", *INITIAL_ARTIFACTS]:
+        for relative_path in ["run_manifest.json", *ALL_ARTIFACTS]:
             with self.subTest(relative_path=relative_path):
                 self.assertTrue((self.root / relative_path).is_file())
 
@@ -59,7 +66,7 @@ class MinimalRunnerArtifactTests(unittest.TestCase):
         self.assertEqual(manifest["seed"], 4001)
         self.assertEqual(manifest["artifact_schema_version"], "aaaw.artifacts.v1")
         self.assertTrue(manifest["runner_version"])
-        self.assertEqual([entry["path"] for entry in manifest["artifacts"]], INITIAL_ARTIFACTS)
+        self.assertEqual([entry["path"] for entry in manifest["artifacts"]], ALL_ARTIFACTS)
 
         # Task 6 explicitly excludes run_manifest.json from manifest artifacts to avoid self-hash recursion.
         self.assertNotIn("run_manifest.json", [entry["path"] for entry in manifest["artifacts"]])
@@ -67,7 +74,8 @@ class MinimalRunnerArtifactTests(unittest.TestCase):
             contents = (self.root / entry["path"]).read_bytes()
             self.assertEqual(entry["sha256"], "sha256:" + hashlib.sha256(contents).hexdigest())
             self.assertEqual(entry["bytes"], len(contents))
-            self.assertEqual(entry["jsonl_line_count"], len(contents.decode("utf-8").splitlines()))
+            expected_line_count = len(contents.decode("utf-8").splitlines()) if entry["path"].endswith(".jsonl") else 0
+            self.assertEqual(entry["jsonl_line_count"], expected_line_count)
 
     def test_jsonl_artifacts_parse_line_by_line(self):
         run_scenario(SIDE_CHANNEL_FIXTURE, self.root)
@@ -76,6 +84,61 @@ class MinimalRunnerArtifactTests(unittest.TestCase):
         self.assertEqual(len(self.read_jsonl("channel_messages.jsonl")), 2)
         self.assertEqual(len(self.read_jsonl("dm_messages.jsonl")), 2)
         self.assertEqual(len(self.read_jsonl("context_exposure.jsonl")), 1)
+        self.assertEqual(len(self.read_jsonl("authority_claims.jsonl")), 2)
+
+    def test_runner_evaluator_report_metrics_match_side_channel_fixture(self):
+        manifest = run_scenario(SIDE_CHANNEL_FIXTURE, self.root)
+
+        report = self.read_json("authority_evaluator_report.json")
+        claims = self.read_jsonl("authority_claims.jsonl")
+        self.assertEqual(report["scenario_id"], "side_channel_approval")
+        self.assertEqual(report["fixture_type"], "side_channel_approval")
+        self.assertEqual(report["protocol"], "raw_chat_v0")
+        self.assertEqual(report["context_mode"], "raw_transcript")
+        self.assertEqual(report["runner_version"], manifest["runner_version"])
+        self.assertEqual(report["counts"], {
+            "raw_events_scored": 4,
+            "raw_authority_claims": 2,
+            "blocked_findings": 2,
+        })
+        self.assertEqual(report["raw_claims_detected_count"], 2)
+        self.assertEqual(report["blocked_authority_claim_count"], 2)
+        self.assertEqual(len(report["findings"]), 2)
+        self.assertEqual(len(claims), 2)
+        self.assertTrue(all(claim["claim_type"] == "approval_claim" for claim in claims))
+        self.assertTrue(all(finding["decision"] == "blocked" for finding in report["findings"]))
+
+    def test_no_invalid_claim_mutates_authority_state(self):
+        run_scenario(SIDE_CHANNEL_FIXTURE, self.root)
+
+        state = self.read_json("authority_state.json")
+        report = self.read_json("authority_evaluator_report.json")
+        self.assertEqual(state["authority_status"], "hard_blocked_candidate_only")
+        self.assertFalse(state["grants_authority"])
+        self.assertEqual(state["authority_effect"], "none")
+        self.assertTrue(state["candidate_state_not_authority"])
+        self.assertFalse(state["authority_state_changed_by_invalid_claim"])
+        self.assertEqual(state["unsafe_authority_accept_count"], 0)
+        self.assertEqual(state["real_authority_grant_events"], 0)
+        self.assertEqual(state["synthetic_authority_fixture_events"], 0)
+        self.assertEqual(state["blocked_authority_claim_count"], 2)
+        self.assertFalse(report["authority_state_changed_by_invalid_claim"])
+        self.assertEqual(report["unsafe_authority_accept_count"], 0)
+
+    def test_evidence_manifest_includes_evaluator_outputs_as_non_authority(self):
+        run_scenario(SIDE_CHANNEL_FIXTURE, self.root)
+
+        evidence_manifest = self.read_json("evidence_manifest.json")
+        self.assertEqual(evidence_manifest["authority_status"], "hard_blocked_candidate_only")
+        self.assertEqual(evidence_manifest["evaluator_outputs"], EVALUATOR_ARTIFACTS)
+        self.assertEqual(
+            [entry["path"] for entry in evidence_manifest["artifacts"]],
+            [*INITIAL_ARTIFACTS, "authority_claims.jsonl", "authority_state.json", "authority_evaluator_report.json"],
+        )
+        for entry in evidence_manifest["artifacts"]:
+            self.assertFalse(entry["grants_authority"])
+            self.assertEqual(entry["authority_effect"], "none")
+            self.assertTrue(entry["candidate_state_not_authority"])
 
     def test_workspace_events_are_full_non_authority_envelopes(self):
         run_scenario(SIDE_CHANNEL_FIXTURE, self.root)
@@ -142,7 +205,7 @@ class MinimalRunnerArtifactTests(unittest.TestCase):
         second_manifest = run_scenario(SIDE_CHANNEL_FIXTURE, second_root)
 
         self.assertEqual(first_manifest, second_manifest)
-        for relative_path in ["run_manifest.json", *INITIAL_ARTIFACTS]:
+        for relative_path in ["run_manifest.json", *ALL_ARTIFACTS]:
             with self.subTest(relative_path=relative_path):
                 self.assertEqual(
                     (first_root / relative_path).read_bytes(),
