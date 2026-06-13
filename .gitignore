@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.DS_Store
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+
+# Generated local run artifacts. Force-add curated examples deliberately.
+runs/*
+!runs/.gitkeep
