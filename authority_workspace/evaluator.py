@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from authority_workspace.artifacts import build_manifest_entries, write_json, write_jsonl
+from authority_workspace.context import ContextExposureError, validate_context_exposure_records
 from authority_workspace.detector import detect_authority_claims
 
 
@@ -67,8 +68,10 @@ def evaluate_run(run_root: str | Path) -> dict[str, Any]:
     _remove_evaluator_outputs(root)
     manifest = _read_json(root / "run_manifest.json")
     raw_events = _read_jsonl(root / "workspace_events.jsonl")
+    context_exposure = _read_jsonl(root / "context_exposure.jsonl")
     _validate_manifest(manifest)
     _validate_raw_events(raw_events)
+    _validate_context_exposure(context_exposure, raw_events, manifest)
 
     claims = _raw_authority_claims(raw_events)
     findings = [_finding_for_claim(claim, manifest) for claim in claims]
@@ -102,10 +105,16 @@ def _remove_evaluator_outputs(root: Path) -> None:
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     records: list[dict[str, Any]] = []
-    with path.open(encoding="utf-8") as handle:
-        for line in handle:
-            if line.strip():
-                records.append(json.loads(line))
+    try:
+        with path.open(encoding="utf-8") as handle:
+            for line_number, line in enumerate(handle, start=1):
+                if line.strip():
+                    try:
+                        records.append(json.loads(line))
+                    except json.JSONDecodeError as exc:
+                        raise EvaluatorInputError(f"{path.name} line {line_number} is not valid JSON") from exc
+    except FileNotFoundError as exc:
+        raise EvaluatorInputError(f"{path.name} is required") from exc
     return records
 
 
@@ -124,6 +133,20 @@ def _validate_raw_events(raw_events: list[dict[str, Any]]) -> None:
                 raise EvaluatorInputError(f"workspace_events.jsonl record {index} missing required field: {field}")
         if event["grants_authority"] is not False or event["authority_effect"] != "none":
             raise EvaluatorInputError(f"workspace_events.jsonl record {index} is not a v0 non-authority event")
+
+
+def _validate_context_exposure(
+    context_exposure: list[dict[str, Any]], raw_events: list[dict[str, Any]], manifest: dict[str, Any]
+) -> None:
+    try:
+        validate_context_exposure_records(
+            context_exposure,
+            raw_events,
+            expected_context_mode=manifest["context_mode"],
+            expected_protocol=manifest["protocol"],
+        )
+    except ContextExposureError as exc:
+        raise EvaluatorInputError(str(exc)) from exc
 
 
 def _raw_authority_claims(raw_events: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:

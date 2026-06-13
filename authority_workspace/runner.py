@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from authority_workspace.artifacts import build_manifest_entries, write_json, write_jsonl
+from authority_workspace.context import build_context_exposure_records
 from authority_workspace.evaluator import EVALUATOR_OUTPUT_PATHS, evaluate_run
 from authority_workspace.events import create_event
 from authority_workspace.scenario import load_scenario
@@ -50,7 +51,7 @@ def run_scenario(
     write_jsonl(root, "workspace_events.jsonl", events)
     write_jsonl(root, "channel_messages.jsonl", _channel_messages(scenario, event_by_source))
     write_jsonl(root, "dm_messages.jsonl", _dm_messages(scenario, event_by_source))
-    write_jsonl(root, "context_exposure.jsonl", _context_exposure(scenario, events))
+    write_jsonl(root, "context_exposure.jsonl", build_context_exposure_records(scenario, events))
     candidate_outputs = _candidate_outputs(scenario, events)
     write_jsonl(root, "tasks.jsonl", candidate_outputs["tasks"])
     write_jsonl(root, "artifact_patches.jsonl", candidate_outputs["artifact_patches"])
@@ -171,49 +172,6 @@ def _dm_messages(
             )
     return records
 
-
-def _context_exposure(scenario: dict[str, Any], events: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    visible_event_ids = [event["event_id"] for event in events]
-    visible_channel_message_ids = [
-        message["message_id"]
-        for channel in scenario["channels"]
-        for message in channel["messages"]
-    ]
-    visible_dm_message_ids = [
-        message["message_id"]
-        for thread in scenario["dm_threads"]
-        for message in thread["messages"]
-    ]
-    deterministic_context = {
-        "scenario_id": scenario["scenario_id"],
-        "protocol": scenario["protocol"],
-        "context_mode": scenario["context_mode"],
-        "visible_event_ids": visible_event_ids,
-        "visible_channel_message_ids": visible_channel_message_ids,
-        "visible_dm_message_ids": visible_dm_message_ids,
-    }
-    deterministic_context_bytes = len(
-        str(sorted(deterministic_context.items())).encode("utf-8")
-    )
-    return [
-        {
-            "exposure_id": "context:initial:raw-workspace",
-            "actor_id": "system:runner",
-            "protocol": scenario["protocol"],
-            "context_mode": scenario["context_mode"],
-            "visible_event_ids": visible_event_ids,
-            "visible_channel_message_ids": visible_channel_message_ids,
-            "visible_dm_message_ids": visible_dm_message_ids,
-            "hidden_canonical_state_refs": [],
-            "poison_markers_visible": [],
-            "context_bytes": deterministic_context_bytes,
-            "deterministic_placeholder": True,
-            "source_event_ids": visible_event_ids,
-            "grants_authority": False,
-            "authority_effect": "none",
-            "candidate_state_not_authority": True,
-        }
-    ]
 
 
 def _candidate_outputs(scenario: dict[str, Any], events: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
