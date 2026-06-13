@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://authority-aware-agent-workspace.local/schemas/scenario.schema.json",
+  "title": "Authority-Aware Agent Workspace Scenario",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "title",
+    "fixture_type",
+    "protocol",
+    "context_mode",
+    "seed",
+    "agents",
+    "channels",
+    "dm_threads",
+    "tasks",
+    "artifact_drafts",
+    "handoffs",
+    "scripted_events"
+  ],
+  "properties": {
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixture_type": {
+      "type": "string",
+      "enum": [
+        "side_channel_approval",
+        "stale_summary",
+        "fake_completion",
+        "channel_membership_authority",
+        "missing_receipt",
+        "poisoned_instruction",
+        "ambiguous_ownership",
+        "overbroad_delegation"
+      ]
+    },
+    "protocol": {
+      "type": "string",
+      "enum": [
+        "raw_chat_v0",
+        "typed_evidence_v0"
+      ]
+    },
+    "context_mode": {
+      "type": "string",
+      "enum": [
+        "raw_transcript",
+        "validated_only",
+        "digest_only",
+        "typed_handoff_only",
+        "evidence_only",
+        "poisoned_raw",
+        "redacted_raw",
+        "attribution_blind"
+      ]
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "agents": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "channels": {
+      "type": "array"
+    },
+    "dm_threads": {
+      "type": "array"
+    },
+    "tasks": {
+      "type": "array"
+    },
+    "artifact_drafts": {
+      "type": "array"
+    },
+    "handoffs": {
+      "type": "array"
+    },
+    "scripted_events": {
+      "type": "array"
+    }
+  }
+}

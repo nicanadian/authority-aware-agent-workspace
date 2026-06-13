@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://authority-aware-agent-workspace.local/schemas/event-envelope.schema.json",
+  "title": "Authority-Aware Agent Workspace Event Envelope",
+  "description": "Canonical v0 event envelope. All v0 events preserve the no-authority invariant: grants_authority is false and authority_effect is none.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "schema_version",
+    "run_id",
+    "event_index",
+    "event_type",
+    "actor_id",
+    "payload",
+    "source_refs",
+    "grants_authority",
+    "authority_effect",
+    "candidate_state_not_authority"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "pattern": "^aaaw-v1-[0-9a-f]{32}$"
+    },
+    "schema_version": {
+      "const": "aaaw.event.v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "event_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "workspace.message.recorded",
+        "workspace.dm.recorded",
+        "workspace.task.proposed",
+        "workspace.artifact_patch.proposed",
+        "workspace.handoff.proposed",
+        "extraction.candidate_state.extracted",
+        "extraction.candidate_state.reviewed",
+        "extraction.handoff.extracted",
+        "extraction.handoff.reviewed",
+        "evidence.receipt.observed",
+        "evaluator.authority_claim.detected",
+        "evaluator.authority_claim.blocked",
+        "evaluator.scope_claim.detected",
+        "evaluator.scope_claim.blocked",
+        "evaluator.finding.recorded",
+        "run.manifest.recorded",
+        "run.summary.recorded"
+      ]
+    },
+    "actor_id": {
+      "type": "string",
+      "pattern": "^(agent|system|evaluator|human):.+$"
+    },
+    "payload": {
+      "description": "Event-specific JSON payload."
+    },
+    "source_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/source_ref"
+      }
+    },
+    "grants_authority": {
+      "const": false
+    },
+    "authority_effect": {
+      "const": "none"
+    },
+    "candidate_state_not_authority": {
+      "const": true
+    },
+    "ts": {
+      "type": "string"
+    },
+    "subject_ref": {
+      "type": "string"
+    },
+    "trace_id": {
+      "type": "string"
+    },
+    "causation_id": {
+      "type": "string"
+    },
+    "correlation_id": {
+      "type": "string"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "not": {
+          "properties": {
+            "event_type": {
+              "enum": [
+                "workspace.message.recorded",
+                "workspace.dm.recorded",
+                "run.manifest.recorded"
+              ]
+            }
+          },
+          "required": [
+            "event_type"
+          ]
+        }
+      },
+      "then": {
+        "properties": {
+          "source_refs": {
+            "minItems": 1
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "source_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref_type",
+        "ref_id",
+        "relationship"
+      ],
+      "properties": {
+        "ref_type": {
+          "type": "string",
+          "enum": [
+            "event",
+            "message",
+            "artifact",
+            "file_hash",
+            "model_call_hash",
+            "external_url"
+          ]
+        },
+        "ref_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relationship": {
+          "type": "string",
+          "enum": [
+            "derived_from",
+            "quotes",
+            "supports",
+            "contradicts",
+            "claims",
+            "blocks",
+            "requires_review"
+          ]
+        }
+      }
+    }
+  }
+}

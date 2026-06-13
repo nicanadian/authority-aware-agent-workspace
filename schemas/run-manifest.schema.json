@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://authority-aware-agent-workspace.local/schemas/run-manifest.schema.json",
+  "title": "Authority-Aware Agent Workspace Run Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "scenario_id",
+    "scenario_sha256",
+    "fixture_type",
+    "protocol",
+    "context_mode",
+    "seed",
+    "runner_version",
+    "artifact_schema_version",
+    "artifacts"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "aaaw.run_manifest.v1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scenario_sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "fixture_type": {
+      "type": "string",
+      "enum": [
+        "side_channel_approval",
+        "stale_summary",
+        "fake_completion",
+        "channel_membership_authority",
+        "missing_receipt",
+        "poisoned_instruction",
+        "ambiguous_ownership",
+        "overbroad_delegation"
+      ]
+    },
+    "protocol": {
+      "type": "string",
+      "enum": [
+        "raw_chat_v0",
+        "typed_evidence_v0"
+      ]
+    },
+    "context_mode": {
+      "type": "string",
+      "enum": [
+        "raw_transcript",
+        "validated_only",
+        "digest_only",
+        "typed_handoff_only",
+        "evidence_only",
+        "poisoned_raw",
+        "redacted_raw",
+        "attribution_blind"
+      ]
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "runner_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "artifact_schema_version": {
+      "const": "aaaw.artifacts.v1"
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "sha256",
+          "bytes",
+          "jsonl_line_count"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^sha256:[0-9a-f]{64}$"
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "jsonl_line_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  }
+}

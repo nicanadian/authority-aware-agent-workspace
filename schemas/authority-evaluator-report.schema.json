@@ -1,0 +1,309 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://authority-aware-agent-workspace.local/schemas/authority-evaluator-report.schema.json",
+  "title": "Authority Evaluator Report",
+  "description": "Non-authoritative evaluator report for v0 authority-boundary measurements.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "scenario_sha256",
+    "fixture_type",
+    "protocol",
+    "context_mode",
+    "seed",
+    "runner_version",
+    "authority_status",
+    "counts",
+    "unsafe_authority_accept_count",
+    "blocked_authority_claim_count",
+    "authority_false_accept_count",
+    "authority_false_reject_count",
+    "real_authority_grant_events",
+    "synthetic_authority_fixture_events",
+    "evidence_linked_candidate_state_rate",
+    "unsupported_candidate_state_count",
+    "orphan_source_ref_count",
+    "missing_source_ref_count",
+    "authority_state_changed_by_invalid_claim",
+    "raw_claims_detected_count",
+    "derived_claims_detected_count",
+    "report_ambiguous_authority_language_count",
+    "findings"
+  ],
+  "properties": {
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scenario_sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "fixture_type": {
+      "type": "string",
+      "enum": [
+        "side_channel_approval",
+        "stale_summary",
+        "fake_completion",
+        "channel_membership_authority",
+        "missing_receipt",
+        "poisoned_instruction",
+        "ambiguous_ownership",
+        "overbroad_delegation"
+      ]
+    },
+    "protocol": {
+      "type": "string",
+      "enum": [
+        "raw_chat_v0",
+        "typed_evidence_v0"
+      ]
+    },
+    "context_mode": {
+      "type": "string",
+      "enum": [
+        "raw_transcript",
+        "validated_only",
+        "digest_only",
+        "typed_handoff_only",
+        "evidence_only",
+        "poisoned_raw",
+        "redacted_raw",
+        "attribution_blind"
+      ]
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "runner_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "authority_status": {
+      "type": "string",
+      "enum": [
+        "hard_blocked_candidate_only",
+        "candidate_only_blocked",
+        "needs_human_review"
+      ]
+    },
+    "counts": {
+      "type": "object"
+    },
+    "unsafe_authority_accept_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "blocked_authority_claim_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "authority_false_accept_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "authority_false_reject_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "real_authority_grant_events": {
+      "const": 0
+    },
+    "synthetic_authority_fixture_events": {
+      "const": 0
+    },
+    "evidence_linked_candidate_state_rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "unsupported_candidate_state_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "orphan_source_ref_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "missing_source_ref_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "authority_state_changed_by_invalid_claim": {
+      "const": false
+    },
+    "raw_claims_detected_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "derived_claims_detected_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "report_ambiguous_authority_language_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    }
+  },
+  "$defs": {
+    "source_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref_type",
+        "ref_id",
+        "relationship"
+      ],
+      "properties": {
+        "ref_type": {
+          "type": "string",
+          "enum": [
+            "event",
+            "message",
+            "artifact",
+            "file_hash",
+            "model_call_hash",
+            "external_url"
+          ]
+        },
+        "ref_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relationship": {
+          "type": "string",
+          "enum": [
+            "derived_from",
+            "quotes",
+            "supports",
+            "contradicts",
+            "claims",
+            "blocks",
+            "requires_review"
+          ]
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "finding_id",
+        "claim_id",
+        "severity",
+        "claim_type",
+        "claim_text",
+        "normalized_claim",
+        "actor_id",
+        "source_event_ids",
+        "evidence_refs",
+        "candidate_state_refs",
+        "asserted_action",
+        "asserted_target",
+        "asserted_scope",
+        "required_rule",
+        "failure_reason",
+        "decision",
+        "human_explanation"
+      ],
+      "properties": {
+        "finding_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "claim_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "authority_critical"
+          ]
+        },
+        "claim_type": {
+          "type": "string",
+          "enum": [
+            "approval_claim",
+            "authorization_claim",
+            "completion_claim",
+            "blocker_closure_claim",
+            "delegation_claim",
+            "receipt_sufficiency_claim",
+            "role_grant_claim",
+            "scope_claim"
+          ]
+        },
+        "claim_text": {
+          "type": "string"
+        },
+        "normalized_claim": {
+          "type": "string"
+        },
+        "actor_id": {
+          "type": "string",
+          "pattern": "^(agent|system|evaluator|human):.+$"
+        },
+        "source_event_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^aaaw-v1-[0-9a-f]{32}$"
+          }
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/source_ref"
+          }
+        },
+        "candidate_state_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "asserted_action": {
+          "type": "string"
+        },
+        "asserted_target": {
+          "type": "string"
+        },
+        "asserted_scope": {
+          "type": "string"
+        },
+        "required_rule": {
+          "type": "string"
+        },
+        "failure_reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "blocked",
+            "accepted_candidate_only",
+            "needs_human_review"
+          ]
+        },
+        "human_explanation": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
