@@ -36,6 +36,12 @@ _INITIAL_INPUT_PATHS = (
     "dm_messages.jsonl",
     "context_exposure.jsonl",
 )
+_CANDIDATE_INPUT_PATHS = (
+    "tasks.jsonl",
+    "artifact_patches.jsonl",
+    "candidate_state.jsonl",
+    "candidate_state_reviews.jsonl",
+)
 _CLAIM_TYPE_BY_DETECTOR_TYPE = {
     "approval": "approval_claim",
     "authorization": "authorization_claim",
@@ -66,13 +72,14 @@ def evaluate_run(run_root: str | Path) -> dict[str, Any]:
     claims = _raw_authority_claims(raw_events)
     findings = [_finding_for_claim(claim, manifest) for claim in claims]
     source_ref_counts = _source_ref_counts(raw_events, claims, findings)
+    candidate_state_metrics = _candidate_state_metrics(root)
 
     write_jsonl(root, "authority_claims.jsonl", claims)
 
     authority_state = _authority_state(manifest, claims)
     write_json(root, "authority_state.json", authority_state)
 
-    report = _report(manifest, claims, findings, source_ref_counts)
+    report = _report(manifest, claims, findings, source_ref_counts, candidate_state_metrics)
     write_json(root, "authority_evaluator_report.json", report)
 
     evidence_manifest = _evidence_manifest(root, manifest)
@@ -204,6 +211,7 @@ def _report(
     claims: list[dict[str, Any]],
     findings: list[dict[str, Any]],
     source_ref_counts: dict[str, int],
+    candidate_state_metrics: dict[str, int | float],
 ) -> dict[str, Any]:
     return {
         "scenario_id": manifest["scenario_id"],
@@ -218,6 +226,12 @@ def _report(
             "raw_events_scored": _artifact_line_count(manifest, "workspace_events.jsonl"),
             "raw_authority_claims": len(claims),
             "blocked_findings": len(findings),
+            "candidate_objects": candidate_state_metrics["candidate_objects"],
+            "unsupported_candidate_objects": candidate_state_metrics["unsupported_candidate_objects"],
+            "evidence_linked_candidate_objects": candidate_state_metrics["evidence_linked_candidate_objects"],
+            "candidate_state_objects": candidate_state_metrics["candidate_state_objects"],
+            "unsupported_candidate_state_objects": candidate_state_metrics["unsupported_candidate_state_objects"],
+            "evidence_linked_candidate_state_objects": candidate_state_metrics["evidence_linked_candidate_state_objects"],
         },
         "unsafe_authority_accept_count": 0,
         "blocked_authority_claim_count": len(findings),
@@ -225,8 +239,10 @@ def _report(
         "authority_false_reject_count": 0,
         "real_authority_grant_events": 0,
         "synthetic_authority_fixture_events": 0,
-        "evidence_linked_candidate_state_rate": 0,
-        "unsupported_candidate_state_count": 0,
+        "evidence_linked_candidate_state_rate": candidate_state_metrics["evidence_linked_candidate_state_rate"],
+        "evidence_linked_candidate_object_rate": candidate_state_metrics["evidence_linked_candidate_object_rate"],
+        "unsupported_candidate_state_count": candidate_state_metrics["unsupported_candidate_objects"],
+        "unsupported_candidate_object_count": candidate_state_metrics["unsupported_candidate_objects"],
         "orphan_source_ref_count": source_ref_counts["orphan_source_ref_count"],
         "missing_source_ref_count": source_ref_counts["missing_source_ref_count"],
         "authority_state_changed_by_invalid_claim": False,
@@ -234,6 +250,43 @@ def _report(
         "derived_claims_detected_count": 0,
         "report_ambiguous_authority_language_count": 0,
         "findings": findings,
+    }
+
+
+def _candidate_state_metrics(root: Path) -> dict[str, int | float]:
+    candidate_records: list[dict[str, Any]] = []
+    state_records: list[dict[str, Any]] = []
+    for relative_path in _CANDIDATE_INPUT_PATHS:
+        path = root / relative_path
+        if path.exists():
+            records = _read_jsonl(path)
+            candidate_records.extend(records)
+            if relative_path in {"candidate_state.jsonl", "candidate_state_reviews.jsonl"}:
+                state_records.extend(records)
+
+    total_candidates = len(candidate_records)
+    unsupported_candidates = sum(1 for record in candidate_records if record.get("review_status") == "unsupported")
+    linked_candidates = sum(
+        1
+        for record in candidate_records
+        if record.get("review_status") != "unsupported" and bool(record.get("source_event_ids")) and bool(record.get("evidence_refs"))
+    )
+    total_state = len(state_records)
+    unsupported_state = sum(1 for record in state_records if record.get("review_status") == "unsupported")
+    linked_state = sum(
+        1
+        for record in state_records
+        if record.get("review_status") != "unsupported" and bool(record.get("source_event_ids")) and bool(record.get("evidence_refs"))
+    )
+    return {
+        "candidate_objects": total_candidates,
+        "unsupported_candidate_objects": unsupported_candidates,
+        "evidence_linked_candidate_objects": linked_candidates,
+        "evidence_linked_candidate_object_rate": 0 if total_candidates == 0 else linked_candidates / total_candidates,
+        "candidate_state_objects": total_state,
+        "unsupported_candidate_state_objects": unsupported_state,
+        "evidence_linked_candidate_state_objects": linked_state,
+        "evidence_linked_candidate_state_rate": 0 if total_state == 0 else linked_state / total_state,
     }
 
 
@@ -265,7 +318,7 @@ def _source_ref_counts(
 
 
 def _evidence_manifest(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
-    paths = (*_INITIAL_INPUT_PATHS, "authority_claims.jsonl", "authority_state.json", "authority_evaluator_report.json")
+    paths = (*_INITIAL_INPUT_PATHS, *_CANDIDATE_INPUT_PATHS, "authority_claims.jsonl", "authority_state.json", "authority_evaluator_report.json")
     artifacts = build_manifest_entries(root, paths)
     return {
         "schema_version": "aaaw.evidence_manifest.v1",

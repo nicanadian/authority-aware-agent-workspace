@@ -25,7 +25,13 @@ INITIAL_ARTIFACT_PATHS = (
     "dm_messages.jsonl",
     "context_exposure.jsonl",
 )
-RUN_ARTIFACT_PATHS = (*INITIAL_ARTIFACT_PATHS, *EVALUATOR_OUTPUT_PATHS)
+CANDIDATE_ARTIFACT_PATHS = (
+    "tasks.jsonl",
+    "artifact_patches.jsonl",
+    "candidate_state.jsonl",
+    "candidate_state_reviews.jsonl",
+)
+RUN_ARTIFACT_PATHS = (*INITIAL_ARTIFACT_PATHS, *CANDIDATE_ARTIFACT_PATHS, *EVALUATOR_OUTPUT_PATHS)
 
 
 def run_scenario(
@@ -45,8 +51,13 @@ def run_scenario(
     write_jsonl(root, "channel_messages.jsonl", _channel_messages(scenario, event_by_source))
     write_jsonl(root, "dm_messages.jsonl", _dm_messages(scenario, event_by_source))
     write_jsonl(root, "context_exposure.jsonl", _context_exposure(scenario, events))
+    candidate_outputs = _candidate_outputs(scenario, events)
+    write_jsonl(root, "tasks.jsonl", candidate_outputs["tasks"])
+    write_jsonl(root, "artifact_patches.jsonl", candidate_outputs["artifact_patches"])
+    write_jsonl(root, "candidate_state.jsonl", candidate_outputs["candidate_state"])
+    write_jsonl(root, "candidate_state_reviews.jsonl", candidate_outputs["candidate_state_reviews"])
 
-    manifest = _manifest(scenario, scenario_file, root, run_id, INITIAL_ARTIFACT_PATHS)
+    manifest = _manifest(scenario, scenario_file, root, run_id, (*INITIAL_ARTIFACT_PATHS, *CANDIDATE_ARTIFACT_PATHS))
     write_json(root, "run_manifest.json", manifest)
 
     evaluate_run(root)
@@ -205,6 +216,156 @@ def _context_exposure(scenario: dict[str, Any], events: list[dict[str, Any]]) ->
     ]
 
 
+def _candidate_outputs(scenario: dict[str, Any], events: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+    """Build deterministic non-authoritative candidate projections."""
+
+    tasks: list[dict[str, Any]] = []
+    artifact_patches: list[dict[str, Any]] = []
+    candidate_state: list[dict[str, Any]] = []
+    candidate_state_reviews: list[dict[str, Any]] = []
+
+    for task in scenario.get("tasks", []):
+        candidate_id = f"candidate:task:{task['task_id']}"
+        task_source_event_ids = _task_source_event_ids(task, events)
+        if task_source_event_ids:
+            base = _candidate_base(candidate_id, "candidate_task", "task", task_source_event_ids)
+            review_base = _candidate_base(f"review:{candidate_id}", "candidate_state_review", "task", task_source_event_ids)
+            review_status = "evidence_linked"
+        else:
+            unsupported_reason = "task projection is not backed by immutable workspace event evidence"
+            base = _unsupported_candidate_base(candidate_id, "candidate_task", "task", unsupported_reason)
+            review_base = _unsupported_candidate_base(
+                f"review:{candidate_id}", "candidate_state_review", "task", unsupported_reason
+            )
+            review_status = "unsupported"
+        tasks.append(
+            {
+                **base,
+                "task_id": task["task_id"],
+                "title": task["title"],
+                "owner": task["owner"],
+                "assignee": task["assignee"],
+                "required_authority": task["required_authority"],
+                "candidate_status": task["status"],
+            }
+        )
+        candidate_state.append(
+            {
+                **base,
+                "state_scope": "candidate",
+                "state_kind": "task",
+                "subject_id": task["task_id"],
+                "candidate_status": task["status"],
+                "mutates_authority_state": False,
+            }
+        )
+        candidate_state_reviews.append(
+            {
+                **review_base,
+                "reviewed_candidate_id": candidate_id,
+                "review_status": review_status,
+                "state_scope": "candidate",
+                "mutates_authority_state": False,
+            }
+        )
+
+    for draft in scenario.get("artifact_drafts", []):
+        patch_id = f"candidate:artifact_patch:{draft['artifact_id']}"
+        unsupported_reason = "fixture artifact draft is not backed by an immutable workspace event in v0"
+        artifact_patches.append(
+            {
+                **_unsupported_candidate_base(patch_id, "candidate_artifact_patch", "artifact_patch", unsupported_reason),
+                "patch_id": patch_id,
+                "artifact_id": draft["artifact_id"],
+                "task_id": draft["task_id"],
+                "author": draft["author"],
+                "operation": "propose_draft_content",
+                "content": draft["content"],
+                "candidate_status": draft["status"],
+            }
+        )
+        state_candidate_id = f"candidate:state:{draft['artifact_id']}"
+        candidate_state.append(
+            {
+                **_unsupported_candidate_base(state_candidate_id, "candidate_state", "artifact_patch", unsupported_reason),
+                "state_scope": "candidate",
+                "state_kind": "artifact",
+                "subject_id": draft["artifact_id"],
+                "candidate_status": draft["status"],
+                "mutates_authority_state": False,
+            }
+        )
+        candidate_state_reviews.append(
+            {
+                **_unsupported_candidate_base(
+                    f"review:{state_candidate_id}",
+                    "candidate_state_review",
+                    "artifact_patch",
+                    "candidate state projection lacks immutable workspace event evidence",
+                ),
+                "reviewed_candidate_id": state_candidate_id,
+                "state_scope": "candidate",
+                "mutates_authority_state": False,
+            }
+        )
+
+    return {
+        "tasks": tasks,
+        "artifact_patches": artifact_patches,
+        "candidate_state": candidate_state,
+        "candidate_state_reviews": candidate_state_reviews,
+    }
+
+
+def _task_source_event_ids(task: dict[str, Any], events: list[dict[str, Any]]) -> list[str]:
+    """Find raw event evidence that semantically introduces the task."""
+
+    title_terms = [term for term in task["title"].lower().replace(":", " ").split() if len(term) > 3]
+    for event in events:
+        text = event.get("payload", {}).get("text", "").lower()
+        if title_terms and all(term in text for term in title_terms[:2]):
+            return [event["event_id"]]
+    return []
+
+
+def _evidence_refs(source_event_ids: list[str]) -> list[dict[str, str]]:
+    return [
+        {"ref_type": "event", "ref_id": event_id, "relationship": "supports"}
+        for event_id in source_event_ids
+    ]
+
+
+def _candidate_base(candidate_id: str, projection_type: str, candidate_type: str, source_event_ids: list[str]) -> dict[str, Any]:
+    return {
+        "candidate_id": candidate_id,
+        "candidate_type": candidate_type,
+        "projection_type": projection_type,
+        "source_event_ids": list(source_event_ids),
+        "evidence_refs": _evidence_refs(source_event_ids),
+        "extraction_method": "scripted_fixture",
+        "review_status": "accepted_candidate",
+        "grants_authority": False,
+        "authority_effect": "none",
+        "candidate_state_not_authority": True,
+    }
+
+
+def _unsupported_candidate_base(candidate_id: str, projection_type: str, candidate_type: str, reason: str) -> dict[str, Any]:
+    return {
+        "candidate_id": candidate_id,
+        "candidate_type": candidate_type,
+        "projection_type": projection_type,
+        "source_event_ids": [],
+        "evidence_refs": [],
+        "extraction_method": "scripted_fixture",
+        "review_status": "unsupported",
+        "unsupported_reason": reason,
+        "grants_authority": False,
+        "authority_effect": "none",
+        "candidate_state_not_authority": True,
+    }
+
+
 def _manifest(
     scenario: dict[str, Any],
     scenario_path: Path,
@@ -228,4 +389,4 @@ def _manifest(
     }
 
 
-__all__ = ["INITIAL_ARTIFACT_PATHS", "RUN_ARTIFACT_PATHS", "RUNNER_VERSION", "run_scenario"]
+__all__ = ["CANDIDATE_ARTIFACT_PATHS", "INITIAL_ARTIFACT_PATHS", "RUN_ARTIFACT_PATHS", "RUNNER_VERSION", "run_scenario"]

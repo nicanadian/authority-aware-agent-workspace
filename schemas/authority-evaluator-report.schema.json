@@ -22,7 +22,9 @@
     "real_authority_grant_events",
     "synthetic_authority_fixture_events",
     "evidence_linked_candidate_state_rate",
+    "evidence_linked_candidate_object_rate",
     "unsupported_candidate_state_count",
+    "unsupported_candidate_object_count",
     "orphan_source_ref_count",
     "missing_source_ref_count",
     "authority_state_changed_by_invalid_claim",
@@ -151,6 +153,15 @@
       "items": {
         "$ref": "#/$defs/finding"
       }
+    },
+    "evidence_linked_candidate_object_rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "unsupported_candidate_object_count": {
+      "type": "integer",
+      "minimum": 0
     }
   },
   "$defs": {

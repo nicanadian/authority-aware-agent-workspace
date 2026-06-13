@@ -24,7 +24,13 @@ EVALUATOR_ARTIFACTS = [
     "authority_evaluator_report.json",
     "evidence_manifest.json",
 ]
-ALL_ARTIFACTS = [*INITIAL_ARTIFACTS, *EVALUATOR_ARTIFACTS]
+CANDIDATE_ARTIFACTS = [
+    "tasks.jsonl",
+    "artifact_patches.jsonl",
+    "candidate_state.jsonl",
+    "candidate_state_reviews.jsonl",
+]
+ALL_ARTIFACTS = [*INITIAL_ARTIFACTS, *CANDIDATE_ARTIFACTS, *EVALUATOR_ARTIFACTS]
 
 
 class MinimalRunnerArtifactTests(unittest.TestCase):
@@ -84,6 +90,10 @@ class MinimalRunnerArtifactTests(unittest.TestCase):
         self.assertEqual(len(self.read_jsonl("channel_messages.jsonl")), 2)
         self.assertEqual(len(self.read_jsonl("dm_messages.jsonl")), 2)
         self.assertEqual(len(self.read_jsonl("context_exposure.jsonl")), 1)
+        self.assertEqual(len(self.read_jsonl("tasks.jsonl")), 1)
+        self.assertEqual(len(self.read_jsonl("artifact_patches.jsonl")), 1)
+        self.assertEqual(len(self.read_jsonl("candidate_state.jsonl")), 2)
+        self.assertEqual(len(self.read_jsonl("candidate_state_reviews.jsonl")), 2)
         self.assertEqual(len(self.read_jsonl("authority_claims.jsonl")), 2)
 
     def test_runner_evaluator_report_metrics_match_side_channel_fixture(self):
@@ -100,9 +110,19 @@ class MinimalRunnerArtifactTests(unittest.TestCase):
             "raw_events_scored": 4,
             "raw_authority_claims": 2,
             "blocked_findings": 2,
+            "candidate_objects": 6,
+            "unsupported_candidate_objects": 3,
+            "evidence_linked_candidate_objects": 3,
+            "candidate_state_objects": 4,
+            "unsupported_candidate_state_objects": 2,
+            "evidence_linked_candidate_state_objects": 2,
         })
         self.assertEqual(report["raw_claims_detected_count"], 2)
         self.assertEqual(report["blocked_authority_claim_count"], 2)
+        self.assertEqual(report["unsupported_candidate_state_count"], 3)
+        self.assertEqual(report["unsupported_candidate_object_count"], 3)
+        self.assertEqual(report["evidence_linked_candidate_state_rate"], 0.5)
+        self.assertEqual(report["evidence_linked_candidate_object_rate"], 0.5)
         self.assertEqual(len(report["findings"]), 2)
         self.assertEqual(len(claims), 2)
         self.assertTrue(all(claim["claim_type"] == "approval_claim" for claim in claims))
@@ -133,7 +153,7 @@ class MinimalRunnerArtifactTests(unittest.TestCase):
         self.assertEqual(evidence_manifest["evaluator_outputs"], EVALUATOR_ARTIFACTS)
         self.assertEqual(
             [entry["path"] for entry in evidence_manifest["artifacts"]],
-            [*INITIAL_ARTIFACTS, "authority_claims.jsonl", "authority_state.json", "authority_evaluator_report.json"],
+            [*INITIAL_ARTIFACTS, *CANDIDATE_ARTIFACTS, "authority_claims.jsonl", "authority_state.json", "authority_evaluator_report.json"],
         )
         for entry in evidence_manifest["artifacts"]:
             self.assertFalse(entry["grants_authority"])
@@ -177,6 +197,101 @@ class MinimalRunnerArtifactTests(unittest.TestCase):
                     self.assertEqual(record["source_event_id"], message_to_event[(source_id, record["message_id"])])
                     self.assertEqual(record["source_event_ids"], [record["source_event_id"]])
                     self.assertIn(record["source_event_id"], event_ids)
+
+    def test_candidate_outputs_are_non_authoritative_and_evidence_linked_or_unsupported(self):
+        run_scenario(SIDE_CHANNEL_FIXTURE, self.root)
+
+        event_ids = {event["event_id"] for event in self.read_jsonl("workspace_events.jsonl")}
+        candidate_records = []
+        for relative_path in CANDIDATE_ARTIFACTS:
+            for record in self.read_jsonl(relative_path):
+                candidate_records.append((relative_path, record))
+
+        self.assertEqual(len(candidate_records), 6)
+        unsupported = []
+        linked_candidate_state = []
+        required_candidate_fields = {
+            "candidate_id",
+            "candidate_type",
+            "source_event_ids",
+            "evidence_refs",
+            "extraction_method",
+            "review_status",
+            "authority_effect",
+            "candidate_state_not_authority",
+        }
+        task_source_event_ids = []
+        for relative_path, record in candidate_records:
+            with self.subTest(relative_path=relative_path, candidate_id=record.get("candidate_id") or record.get("task_id") or record.get("patch_id")):
+                self.assertTrue(required_candidate_fields.issubset(record), sorted(set(required_candidate_fields) - set(record)))
+                self.assertFalse(record["grants_authority"])
+                self.assertEqual(record["authority_effect"], "none")
+                self.assertTrue(record["candidate_state_not_authority"])
+                self.assertNotIn(record.get("authority_status"), {"approved", "authorized", "granted"})
+
+                if record.get("review_status") == "unsupported":
+                    unsupported.append(record)
+                    self.assertEqual(record["source_event_ids"], [])
+                    self.assertEqual(record["evidence_refs"], [])
+                    self.assertTrue(record["unsupported_reason"])
+                else:
+                    self.assertGreaterEqual(len(record["source_event_ids"]), 1)
+                    self.assertTrue(set(record["source_event_ids"]).issubset(event_ids))
+                    self.assertTrue(record["evidence_refs"])
+                    if record.get("candidate_id") == "candidate:task:task:release-note":
+                        task_source_event_ids = record["source_event_ids"]
+                    if relative_path in {"candidate_state.jsonl", "candidate_state_reviews.jsonl"}:
+                        linked_candidate_state.append(record)
+
+        source_messages = {
+            event["event_id"]: event["payload"].get("message_id")
+            for event in self.read_jsonl("workspace_events.jsonl")
+        }
+        self.assertEqual([source_messages[event_id] for event_id in task_source_event_ids], ["msg:release:001"])
+        self.assertEqual(len(unsupported), 3)
+        self.assertEqual(len(linked_candidate_state), 2)
+
+    def test_candidate_state_does_not_mutate_authority_state(self):
+        run_scenario(SIDE_CHANNEL_FIXTURE, self.root)
+
+        authority_state = self.read_json("authority_state.json")
+        candidate_state = self.read_jsonl("candidate_state.jsonl")
+
+        self.assertTrue(candidate_state)
+        self.assertEqual(authority_state["authority_status"], "hard_blocked_candidate_only")
+        self.assertFalse(authority_state["grants_authority"])
+        self.assertEqual(authority_state["authority_effect"], "none")
+        self.assertEqual(authority_state["unsafe_authority_accept_count"], 0)
+        for record in candidate_state:
+            with self.subTest(candidate_id=record["candidate_id"]):
+                self.assertEqual(record["state_scope"], "candidate")
+                self.assertFalse(record["mutates_authority_state"])
+                self.assertNotEqual(record.get("state_scope"), "authority")
+
+    def test_unmatched_task_candidate_is_marked_unsupported_not_evidence_linked(self):
+        scenario = json.loads(SIDE_CHANNEL_FIXTURE.read_text(encoding="utf-8"))
+        scenario["tasks"][0]["title"] = "Opaque unmatched work item"
+        unmatched_fixture = self.root / "unmatched_task.json"
+        unmatched_fixture.parent.mkdir(parents=True, exist_ok=True)
+        unmatched_fixture.write_text(json.dumps(scenario, sort_keys=True), encoding="utf-8")
+
+        run_scenario(unmatched_fixture, self.root / "unmatched-run")
+        candidate_tasks = self.read_jsonl_from(self.root / "unmatched-run", "tasks.jsonl")
+        candidate_reviews = self.read_jsonl_from(self.root / "unmatched-run", "candidate_state_reviews.jsonl")
+        report = json.loads((self.root / "unmatched-run" / "authority_evaluator_report.json").read_text(encoding="utf-8"))
+
+        task_record = candidate_tasks[0]
+        review_record = next(record for record in candidate_reviews if record["reviewed_candidate_id"] == task_record["candidate_id"])
+        for record in [task_record, review_record]:
+            self.assertEqual(record["review_status"], "unsupported")
+            self.assertEqual(record["source_event_ids"], [])
+            self.assertEqual(record["evidence_refs"], [])
+        self.assertEqual(report["unsupported_candidate_object_count"], 6)
+        self.assertEqual(report["evidence_linked_candidate_object_rate"], 0)
+
+    def read_jsonl_from(self, root, relative_path):
+        with (root / relative_path).open(encoding="utf-8") as handle:
+            return [json.loads(line) for line in handle]
 
     def test_context_exposure_records_visibility_and_no_model_call_context(self):
         run_scenario(SIDE_CHANNEL_FIXTURE, self.root)
