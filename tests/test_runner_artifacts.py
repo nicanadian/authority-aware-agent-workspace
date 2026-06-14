@@ -17,6 +17,7 @@ INITIAL_ARTIFACTS = [
     "channel_messages.jsonl",
     "dm_messages.jsonl",
     "context_exposure.jsonl",
+    "materialized_contexts.jsonl",
 ]
 EVALUATOR_ARTIFACTS = [
     "authority_claims.jsonl",
@@ -95,6 +96,7 @@ class MinimalRunnerArtifactTests(unittest.TestCase):
         self.assertEqual(len(self.read_jsonl("channel_messages.jsonl")), 2)
         self.assertEqual(len(self.read_jsonl("dm_messages.jsonl")), 2)
         self.assertEqual(len(self.read_jsonl("context_exposure.jsonl")), 4)
+        self.assertEqual(len(self.read_jsonl("materialized_contexts.jsonl")), 4)
         self.assertEqual(len(self.read_jsonl("tasks.jsonl")), 1)
         self.assertEqual(len(self.read_jsonl("artifact_patches.jsonl")), 1)
         self.assertEqual(len(self.read_jsonl("candidate_state.jsonl")), 2)
@@ -324,7 +326,7 @@ class MinimalRunnerArtifactTests(unittest.TestCase):
         with (root / relative_path).open(encoding="utf-8") as handle:
             return [json.loads(line) for line in handle]
 
-    def test_context_exposure_records_visibility_and_no_model_call_context(self):
+    def test_context_exposure_records_visibility_and_materialized_no_model_context(self):
         run_scenario(SIDE_CHANNEL_FIXTURE, self.root)
 
         event_ids = [event["event_id"] for event in self.read_jsonl("workspace_events.jsonl")]
@@ -337,9 +339,11 @@ class MinimalRunnerArtifactTests(unittest.TestCase):
         self.assertEqual(exposure["source_event_ids"], [event_ids[0]])
         self.assertEqual(exposure["hidden_canonical_state_refs"], [])
         self.assertEqual(exposure["poison_markers_visible"], [])
-        self.assertEqual(exposure["prompt_bytes"], 0)
-        self.assertEqual(exposure["context_bytes"], 0)
-        self.assertTrue(exposure["deterministic_placeholder"])
+        self.assertGreater(exposure["prompt_bytes"], 0)
+        self.assertGreater(exposure["context_bytes"], 0)
+        self.assertEqual(exposure["materialized_context_path"], "materialized_contexts.jsonl")
+        self.assertEqual(exposure["context_materialization_status"], "implemented")
+        self.assertFalse(exposure["deterministic_placeholder"])
         self.assertFalse(exposure["grants_authority"])
         self.assertEqual(exposure["authority_effect"], "none")
         self.assertTrue(exposure["candidate_state_not_authority"])

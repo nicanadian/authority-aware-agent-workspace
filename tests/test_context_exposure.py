@@ -89,7 +89,7 @@ class ContextExposureEvaluatorTests(unittest.TestCase):
                 self.assertIn("hidden_canonical_state_refs", exposure)
                 self.assertEqual(exposure["hidden_canonical_state_refs"], [])
 
-    def test_live_only_byte_fields_have_deterministic_placeholders_in_v0(self):
+    def test_context_byte_fields_are_real_materialized_metadata(self):
         run_scenario(SIDE_CHANNEL_FIXTURE, self.root)
 
         exposures = self.read_jsonl(self.root, "context_exposure.jsonl")
@@ -97,9 +97,11 @@ class ContextExposureEvaluatorTests(unittest.TestCase):
         self.assertTrue(exposures)
         for exposure in exposures:
             with self.subTest(exposure_id=exposure["exposure_id"]):
-                self.assertTrue(exposure["deterministic_placeholder"])
-                self.assertEqual(exposure["prompt_bytes"], 0)
-                self.assertEqual(exposure["context_bytes"], 0)
+                self.assertFalse(exposure["deterministic_placeholder"])
+                self.assertGreater(exposure["prompt_bytes"], 0)
+                self.assertGreater(exposure["context_bytes"], 0)
+                self.assertEqual(exposure["materialized_context_path"], "materialized_contexts.jsonl")
+                self.assertRegex(exposure["context_sha256"], r"^sha256:[0-9a-f]{64}$")
 
     def test_evaluator_rejects_missing_context_exposure_for_workspace_event(self):
         run_scenario(SIDE_CHANNEL_FIXTURE, self.root)

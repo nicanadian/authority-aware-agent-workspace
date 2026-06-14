@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from authority_workspace.artifacts import build_manifest_entries, write_json, write_jsonl
-from authority_workspace.context import build_context_exposure_records
+from authority_workspace.context import MATERIALIZED_CONTEXT_PATH, build_context_exposure_records, build_materialized_context_records
 from authority_workspace.evaluator import EVALUATOR_OUTPUT_PATHS, evaluate_run
 from authority_workspace.events import create_event
 from authority_workspace.report import REPORT_OUTPUT_PATHS, generate_report
@@ -27,6 +27,7 @@ INITIAL_ARTIFACT_PATHS = (
     "channel_messages.jsonl",
     "dm_messages.jsonl",
     "context_exposure.jsonl",
+    MATERIALIZED_CONTEXT_PATH,
 )
 CANDIDATE_ARTIFACT_PATHS = (
     "tasks.jsonl",
@@ -54,6 +55,7 @@ def run_scenario(
     write_jsonl(root, "channel_messages.jsonl", _channel_messages(scenario, event_by_source))
     write_jsonl(root, "dm_messages.jsonl", _dm_messages(scenario, event_by_source))
     write_jsonl(root, "context_exposure.jsonl", build_context_exposure_records(scenario, events))
+    write_jsonl(root, MATERIALIZED_CONTEXT_PATH, build_materialized_context_records(scenario, events))
     candidate_outputs = _candidate_outputs(scenario, events)
     write_jsonl(root, "tasks.jsonl", candidate_outputs["tasks"])
     write_jsonl(root, "artifact_patches.jsonl", candidate_outputs["artifact_patches"])

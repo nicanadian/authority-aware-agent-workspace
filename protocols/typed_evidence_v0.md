@@ -72,7 +72,8 @@ Required initial artifacts:
 - `workspace_events.jsonl`: canonical non-authority event envelopes and source anchors;
 - `channel_messages.jsonl`: channel/message projections linked back to raw workspace events;
 - `dm_messages.jsonl`: DM projections linked back to raw workspace events;
-- `context_exposure.jsonl`: deterministic records of what context was exposed and how.
+- `context_exposure.jsonl`: deterministic records of what context was exposed and how;
+- `materialized_contexts.jsonl`: deterministic materialized context text surfaces referenced by exposure records.
 
 Required candidate artifacts:
 

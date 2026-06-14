@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from authority_workspace.artifacts import build_manifest_entries, write_json, write_jsonl
-from authority_workspace.context import ContextExposureError, validate_context_exposure_records
+from authority_workspace.context import MATERIALIZED_CONTEXT_PATH, ContextExposureError, validate_context_exposure_records
 from authority_workspace.detector import detect_authority_claims
 
 
@@ -39,6 +39,7 @@ _INITIAL_INPUT_PATHS = (
     "channel_messages.jsonl",
     "dm_messages.jsonl",
     "context_exposure.jsonl",
+    MATERIALIZED_CONTEXT_PATH,
 )
 _CANDIDATE_INPUT_PATHS = (
     "tasks.jsonl",
@@ -91,7 +92,7 @@ def evaluate_run(run_root: str | Path) -> dict[str, Any]:
     context_exposure = _read_jsonl(root / "context_exposure.jsonl")
     _validate_manifest(manifest)
     _validate_raw_events(raw_events, manifest)
-    _validate_context_exposure(context_exposure, raw_events, manifest)
+    _validate_context_exposure(context_exposure, raw_events, manifest, root)
 
     synthetic_controls = _synthetic_authority_controls(raw_events)
     raw_claims = _raw_authority_claims(raw_events)
@@ -173,7 +174,7 @@ def _synthetic_fixture_enabled(manifest: dict[str, Any]) -> bool:
 
 
 def _validate_context_exposure(
-    context_exposure: list[dict[str, Any]], raw_events: list[dict[str, Any]], manifest: dict[str, Any]
+    context_exposure: list[dict[str, Any]], raw_events: list[dict[str, Any]], manifest: dict[str, Any], root: Path
 ) -> None:
     try:
         validate_context_exposure_records(
@@ -181,6 +182,7 @@ def _validate_context_exposure(
             raw_events,
             expected_context_mode=manifest["context_mode"],
             expected_protocol=manifest["protocol"],
+            run_root=root,
         )
     except ContextExposureError as exc:
         raise EvaluatorInputError(str(exc)) from exc
