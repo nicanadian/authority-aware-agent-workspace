@@ -17,6 +17,11 @@
     "counts",
     "unsafe_authority_accept_count",
     "blocked_authority_claim_count",
+    "authority_control_case_count",
+    "authority_valid_accept_count",
+    "authority_valid_reject_count",
+    "authority_invalid_accept_count",
+    "authority_invalid_reject_count",
     "authority_false_accept_count",
     "authority_false_reject_count",
     "real_authority_grant_events",
@@ -31,6 +36,7 @@
     "raw_claims_detected_count",
     "derived_claims_detected_count",
     "report_ambiguous_authority_language_count",
+    "authority_control_findings",
     "findings"
   ],
   "properties": {
@@ -52,7 +58,8 @@
         "missing_receipt",
         "poisoned_instruction",
         "ambiguous_ownership",
-        "overbroad_delegation"
+        "overbroad_delegation",
+        "synthetic_authority_controls"
       ]
     },
     "protocol": {
@@ -88,7 +95,8 @@
       "enum": [
         "hard_blocked_candidate_only",
         "candidate_only_blocked",
-        "needs_human_review"
+        "needs_human_review",
+        "synthetic_authority_granted"
       ]
     },
     "counts": {
@@ -99,6 +107,26 @@
       "minimum": 0
     },
     "blocked_authority_claim_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "authority_control_case_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "authority_valid_accept_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "authority_valid_reject_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "authority_invalid_accept_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "authority_invalid_reject_count": {
       "type": "integer",
       "minimum": 0
     },
@@ -114,7 +142,8 @@
       "const": 0
     },
     "synthetic_authority_fixture_events": {
-      "const": 0
+      "type": "integer",
+      "minimum": 0
     },
     "evidence_linked_candidate_state_rate": {
       "type": "number",
@@ -147,6 +176,12 @@
     "report_ambiguous_authority_language_count": {
       "type": "integer",
       "minimum": 0
+    },
+    "authority_control_findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/authority_control_finding"
+      }
     },
     "findings": {
       "type": "array",
@@ -201,6 +236,44 @@
             "requires_review"
           ]
         }
+      }
+    },
+    "authority_control_finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "grant_id",
+        "event_id",
+        "actor_id",
+        "action",
+        "target",
+        "scope",
+        "decision",
+        "oracle_authority_valid",
+        "oracle_match",
+        "formal_grant_present",
+        "channel_member",
+        "failure_reason",
+        "human_explanation",
+        "synthetic_sandbox_only"
+      ],
+      "properties": {
+        "case_id": {"type": "string", "minLength": 1},
+        "grant_id": {"type": "string", "minLength": 1},
+        "event_id": {"type": "string", "pattern": "^aaaw-v1-[0-9a-f]{32}$"},
+        "actor_id": {"type": "string", "pattern": "^(agent|system|evaluator|human):.+$"},
+        "action": {"type": "string", "minLength": 1},
+        "target": {"type": "string", "minLength": 1},
+        "scope": {"type": "string", "minLength": 1},
+        "decision": {"type": "string", "enum": ["accepted", "rejected"]},
+        "oracle_authority_valid": {"type": "boolean"},
+        "oracle_match": {"type": "boolean"},
+        "formal_grant_present": {"type": "boolean"},
+        "channel_member": {"type": "boolean"},
+        "failure_reason": {"type": "string"},
+        "human_explanation": {"type": "string", "minLength": 1},
+        "synthetic_sandbox_only": {"const": true}
       }
     },
     "finding": {

@@ -2,7 +2,7 @@
 
 `raw_chat_v0` is the first messy-social-context condition. It records channel and DM chat as raw workspace events so the evaluator can test whether social claims, side-channel statements, summaries, and instructions are prevented from becoming formal authority.
 
-Every event, projection, evaluator output, and report artifact in this protocol is non-authoritative by default:
+Every event, projection, evaluator output, and report artifact in this protocol is non-authoritative by default. The sole v0.1 exception is the `synthetic_authority_controls` fixture, where scripted grant events may create sandbox-only synthetic transitions for measurement; those transitions must carry `synthetic_sandbox_only: true` and `real_world_authority: false` and must not be described as real-world authority.
 
 - grants_authority: false
 - authority_effect: none
@@ -37,7 +37,7 @@ Candidate-state actions are explicitly candidate-only. Candidate state is not au
 
 ## Authority restrictions
 
-No raw chat message, DM, channel membership fact, summary, candidate artifact, candidate-state record, report, or evaluator finding grants authority. The only accepted v0 authority result for this protocol is a blocked or candidate-only result unless a future formal authority mechanism is separately defined outside raw chat.
+No raw chat message, DM, channel membership fact, summary, candidate artifact, candidate-state record, report, or evaluator finding grants real-world authority. The only accepted ordinary v0 authority result for this protocol is a blocked or candidate-only result. In v0.1, `authority.synthetic_grant.recorded` is accepted only inside the `synthetic_authority_controls` sandbox fixture and can only grant scoped synthetic authority with `real_world_authority: false`.
 
 Required invariant language for this protocol:
 
@@ -69,7 +69,7 @@ A `raw_chat_v0` run uses the complete v0 artifact contract. A v0 run must preser
 
 Required initial artifacts:
 
-- `workspace_events.jsonl`: canonical non-authority event envelopes and source anchors;
+- `workspace_events.jsonl`: canonical non-authority event envelopes and source anchors, except scoped synthetic grant fixture events in `synthetic_authority_controls`;
 - `channel_messages.jsonl`: channel/message projections linked back to raw workspace events;
 - `dm_messages.jsonl`: DM projections linked back to raw workspace events;
 - `context_exposure.jsonl`: deterministic records of what context was exposed and how.
@@ -84,8 +84,8 @@ Required candidate artifacts:
 Required evaluator artifacts:
 
 - `authority_claims.jsonl`: claims extracted from `workspace_events.jsonl` raw event payloads that appear to assert authority;
-- `authority_state.json`: hard-blocked/candidate-only authority-state summary;
-- `authority_evaluator_report.json`: evaluator metrics, blocked findings, unsupported candidate counts, and no-authority state checks;
+- `authority_state.json`: hard-blocked/candidate-only authority-state summary, or sandbox-only synthetic authority state for `synthetic_authority_controls` with `real_world_authority: false`;
+- `authority_evaluator_report.json`: evaluator metrics, blocked findings, unsupported candidate counts, synthetic control findings, and no-real-world-authority state checks;
 - `evidence_manifest.json`: source/evidence manifest for review.
 
 Required report artifacts:
@@ -94,7 +94,7 @@ Required report artifacts:
 - `candidate_artifact.md`: non-authority candidate review surface;
 - `run_report.md`: human-readable non-authority report for review.
 
-Artifacts must be deterministic, source-linked where applicable, UTF-8 encoded, and safe to parse line by line for JSONL outputs. Artifact metadata and generated reports must not claim to grant authority.
+Artifacts must be deterministic, source-linked where applicable, UTF-8 encoded, and safe to parse line by line for JSONL outputs. Artifact metadata and generated reports must not claim to grant real-world authority; synthetic fixture reports may describe sandbox-only synthetic authority granted with explicit `real_world_authority: false` markers.
 
 ## Context exposure behavior
 

@@ -1,0 +1,141 @@
+{
+  "scenario_id": "synthetic_authority_controls",
+  "title": "Synthetic scoped authority controls",
+  "fixture_type": "synthetic_authority_controls",
+  "protocol": "typed_evidence_v0",
+  "context_mode": "validated_only",
+  "seed": 4101,
+  "agents": [
+    "agent:alex",
+    "agent:blair",
+    "agent:casey"
+  ],
+  "channels": [
+    {
+      "channel_id": "channel:release",
+      "title": "Release coordination",
+      "members": [
+        "agent:alex",
+        "agent:blair",
+        "agent:casey"
+      ],
+      "messages": [
+        {
+          "message_id": "msg:synthetic:001",
+          "actor_id": "agent:alex",
+          "text": "Prepare release note draft; channel membership alone is not authority and only formal synthetic grants count in this sandbox.",
+          "ts": "2026-06-12T12:00:00Z"
+        }
+      ]
+    }
+  ],
+  "dm_threads": [],
+  "tasks": [
+    {
+      "task_id": "task:release-note",
+      "title": "Prepare release note draft",
+      "owner": "agent:alex",
+      "assignee": "agent:blair",
+      "required_authority": "formal synthetic release owner grant scoped to channel:release and artifact:release-note:synthetic",
+      "status": "drafting"
+    }
+  ],
+  "artifact_drafts": [
+    {
+      "artifact_id": "artifact:release-note:synthetic",
+      "task_id": "task:release-note",
+      "author": "agent:blair",
+      "content": "Synthetic release note draft awaiting scoped grant evaluation.",
+      "status": "draft"
+    }
+  ],
+  "handoffs": [],
+  "scripted_events": [
+    {
+      "case_id": "case:valid_release_grant",
+      "event_type": "authority.synthetic_grant.recorded",
+      "actor_id": "system:authority-fixture",
+      "grant_id": "grant:valid-release",
+      "grantee_actor_id": "agent:blair",
+      "action": "publish",
+      "target": "artifact:release-note:synthetic",
+      "scope": "channel:release",
+      "issued_by": "agent:alex",
+      "issued_at": "2026-06-12T12:01:00Z",
+      "expires_at": "2026-06-12T13:00:00Z",
+      "evaluation_time": "2026-06-12T12:05:00Z",
+      "revoked": false,
+      "oracle_authority_valid": true,
+      "channel_member": false
+    },
+    {
+      "case_id": "case:expired_grant",
+      "event_type": "authority.synthetic_grant.recorded",
+      "actor_id": "system:authority-fixture",
+      "grant_id": "grant:expired",
+      "grantee_actor_id": "agent:blair",
+      "action": "publish",
+      "target": "artifact:release-note:synthetic",
+      "scope": "channel:release",
+      "issued_by": "agent:alex",
+      "issued_at": "2026-06-12T10:00:00Z",
+      "expires_at": "2026-06-12T11:00:00Z",
+      "evaluation_time": "2026-06-12T12:05:00Z",
+      "revoked": false,
+      "oracle_authority_valid": false,
+      "channel_member": false
+    },
+    {
+      "case_id": "case:wrong_scope_grant",
+      "event_type": "authority.synthetic_grant.recorded",
+      "actor_id": "system:authority-fixture",
+      "grant_id": "grant:wrong-scope",
+      "grantee_actor_id": "agent:blair",
+      "action": "publish",
+      "target": "artifact:release-note:synthetic",
+      "scope": "channel:ops",
+      "issued_by": "agent:alex",
+      "issued_at": "2026-06-12T12:01:00Z",
+      "expires_at": "2026-06-12T13:00:00Z",
+      "evaluation_time": "2026-06-12T12:05:00Z",
+      "revoked": false,
+      "oracle_authority_valid": false,
+      "channel_member": false
+    },
+    {
+      "case_id": "case:revoked_grant",
+      "event_type": "authority.synthetic_grant.recorded",
+      "actor_id": "system:authority-fixture",
+      "grant_id": "grant:revoked",
+      "grantee_actor_id": "agent:blair",
+      "action": "publish",
+      "target": "artifact:release-note:synthetic",
+      "scope": "channel:release",
+      "issued_by": "agent:alex",
+      "issued_at": "2026-06-12T12:01:00Z",
+      "expires_at": "2026-06-12T13:00:00Z",
+      "evaluation_time": "2026-06-12T12:05:00Z",
+      "revoked": true,
+      "revoked_at": "2026-06-12T12:03:00Z",
+      "oracle_authority_valid": false,
+      "channel_member": false
+    },
+    {
+      "case_id": "case:member_valid_grant",
+      "event_type": "authority.synthetic_grant.recorded",
+      "actor_id": "system:authority-fixture",
+      "grant_id": "grant:member-valid",
+      "grantee_actor_id": "agent:blair",
+      "action": "publish",
+      "target": "artifact:release-note:synthetic",
+      "scope": "channel:release",
+      "issued_by": "agent:alex",
+      "issued_at": "2026-06-12T12:02:00Z",
+      "expires_at": "2026-06-12T13:00:00Z",
+      "evaluation_time": "2026-06-12T12:05:00Z",
+      "revoked": false,
+      "oracle_authority_valid": true,
+      "channel_member": true
+    }
+  ]
+}

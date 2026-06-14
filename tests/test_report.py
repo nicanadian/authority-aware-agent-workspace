@@ -11,6 +11,7 @@ from authority_workspace.runner import run_scenario
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SIDE_CHANNEL_FIXTURE = REPO_ROOT / "scenarios" / "fixtures" / "side_channel_approval.json"
+SYNTHETIC_AUTHORITY_FIXTURE = REPO_ROOT / "scenarios" / "fixtures" / "synthetic_authority_controls.json"
 NON_AUTHORITY_DISCLAIMER = (
     "NON-AUTHORITY REPORT: This artifact is for human review only and does not grant, approve, "
     "authorize, or change authority state."
@@ -165,6 +166,20 @@ class ReplayReportTests(unittest.TestCase):
                 self.assertFalse(entry["grants_authority"])
                 self.assertEqual(entry["authority_effect"], "none")
                 self.assertTrue(entry["candidate_state_not_authority"])
+
+    def test_synthetic_run_report_renders_sandbox_authority_without_real_authority(self):
+        synthetic_root = Path(self.tmp.name) / "synthetic-run"
+        run_scenario(SYNTHETIC_AUTHORITY_FIXTURE, synthetic_root)
+
+        report_text = (synthetic_root / "run_report.md").read_text(encoding="utf-8")
+        self.assertIn("synthetic_authority_granted", report_text)
+        self.assertIn("grants_authority: true", report_text)
+        self.assertIn("authority_effect: synthetic_scoped_authority_granted", report_text)
+        self.assertIn("synthetic_sandbox_only: true", report_text)
+        self.assertIn("real_world_authority: false", report_text)
+        self.assertIn("Sandbox-only synthetic authority transitions", report_text)
+        self.assertIn("case:valid_release_grant", report_text)
+        self.assertNotIn("no positive authority path", report_text.lower())
 
 
 if __name__ == "__main__":

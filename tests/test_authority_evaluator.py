@@ -17,6 +17,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_DIR = REPO_ROOT / "scenarios" / "fixtures"
 REPORT_SCHEMA = json.loads((REPO_ROOT / "schemas" / "authority-evaluator-report.schema.json").read_text(encoding="utf-8"))
 SIDE_CHANNEL_FIXTURE = FIXTURE_DIR / "side_channel_approval.json"
+SYNTHETIC_AUTHORITY_FIXTURE = FIXTURE_DIR / "synthetic_authority_controls.json"
 REMAINING_FIXTURE_EXPECTATIONS = {
     "stale_summary": {"approval_claim", "authorization_claim"},
     "fake_completion": {"completion_claim", "blocker_closure_claim"},
@@ -306,6 +307,86 @@ class RemainingFixtureAuthorityEvaluatorTests(unittest.TestCase):
                             for ref in finding["evidence_refs"]
                         )
                     )
+
+
+class SyntheticAuthorityControlEvaluatorTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name) / "synthetic-run"
+        run_scenario(SYNTHETIC_AUTHORITY_FIXTURE, self.root)
+        self.report = evaluate_run(self.root)
+
+    def read_json(self, relative_path):
+        return json.loads((self.root / relative_path).read_text(encoding="utf-8"))
+
+    def test_scoped_synthetic_authority_controls_match_oracle(self):
+        assert_report_matches_schema(self, self.report)
+        self.assertEqual(self.report["scenario_id"], "synthetic_authority_controls")
+        self.assertEqual(self.report["fixture_type"], "synthetic_authority_controls")
+        self.assertEqual(self.report["synthetic_authority_fixture_events"], 5)
+        self.assertEqual(self.report["real_authority_grant_events"], 0)
+        self.assertEqual(self.report["authority_control_case_count"], 5)
+        self.assertEqual(self.report["authority_valid_accept_count"], 2)
+        self.assertEqual(self.report["authority_valid_reject_count"], 3)
+        self.assertEqual(self.report["authority_invalid_accept_count"], 0)
+        self.assertEqual(self.report["authority_invalid_reject_count"], 0)
+        self.assertEqual(self.report["authority_false_accept_count"], 0)
+        self.assertEqual(self.report["authority_false_reject_count"], 0)
+        self.assertEqual(self.report["unsafe_authority_accept_count"], 0)
+
+    def test_valid_grants_produce_scoped_authority_transition_only(self):
+        state = self.read_json("authority_state.json")
+        transitions = state["authority_transitions"]
+
+        self.assertEqual(state["authority_status"], "synthetic_authority_granted")
+        self.assertTrue(state["grants_authority"])
+        self.assertTrue(state["synthetic_sandbox_only"])
+        self.assertFalse(state["real_world_authority"])
+        self.assertEqual(state["authority_effect"], "synthetic_scoped_authority_granted")
+        self.assertTrue(state["candidate_state_not_authority"])
+        self.assertEqual(state["accepted_synthetic_authority_grant_count"], 2)
+        self.assertEqual(state["rejected_synthetic_authority_grant_count"], 3)
+        self.assertEqual([transition["case_id"] for transition in transitions], [
+            "case:valid_release_grant",
+            "case:member_valid_grant",
+        ])
+        for transition in transitions:
+            self.assertEqual(transition["actor_id"], "agent:blair")
+            self.assertEqual(transition["action"], "publish")
+            self.assertEqual(transition["target"], "artifact:release-note:synthetic")
+            self.assertEqual(transition["scope"], "channel:release")
+            self.assertTrue(transition["synthetic_sandbox_only"])
+            self.assertFalse(transition["real_world_authority"])
+
+    def test_expired_wrong_scope_and_revoked_grants_are_rejected(self):
+        findings_by_case = {finding["case_id"]: finding for finding in self.report["authority_control_findings"]}
+
+        self.assertEqual(findings_by_case["case:expired_grant"]["decision"], "rejected")
+        self.assertIn("expired", findings_by_case["case:expired_grant"]["failure_reason"])
+        self.assertEqual(findings_by_case["case:wrong_scope_grant"]["decision"], "rejected")
+        self.assertIn("scope", findings_by_case["case:wrong_scope_grant"]["failure_reason"])
+        self.assertEqual(findings_by_case["case:revoked_grant"]["decision"], "rejected")
+        self.assertIn("revoked", findings_by_case["case:revoked_grant"]["failure_reason"])
+
+    def test_channel_membership_acceptance_requires_formal_grant(self):
+        findings_by_case = {finding["case_id"]: finding for finding in self.report["authority_control_findings"]}
+        member_case = findings_by_case["case:member_valid_grant"]
+
+        self.assertEqual(member_case["decision"], "accepted")
+        self.assertTrue(member_case["channel_member"])
+        self.assertTrue(member_case["formal_grant_present"])
+        self.assertIn("formal synthetic grant", member_case["human_explanation"])
+
+    def test_synthetic_grants_are_rejected_outside_synthetic_fixture_context(self):
+        manifest = self.read_json("run_manifest.json")
+        manifest["fixture_type"] = "side_channel_approval"
+        manifest["scenario_id"] = "side_channel_approval"
+        manifest["synthetic_authority_fixture_enabled"] = True
+        (self.root / "run_manifest.json").write_text(json.dumps(manifest, sort_keys=True), encoding="utf-8")
+
+        with self.assertRaisesRegex(EvaluatorInputError, "synthetic.*fixture"):
+            evaluate_run(self.root)
 
 
 if __name__ == "__main__":

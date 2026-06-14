@@ -38,7 +38,8 @@
         "missing_receipt",
         "poisoned_instruction",
         "ambiguous_ownership",
-        "overbroad_delegation"
+        "overbroad_delegation",
+        "synthetic_authority_controls"
       ]
     },
     "protocol": {

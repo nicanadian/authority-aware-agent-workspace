@@ -35,10 +35,16 @@ FIXTURE_TYPES = [
     "poisoned_instruction",
     "ambiguous_ownership",
     "overbroad_delegation",
+    "synthetic_authority_controls",
 ]
 OUTCOME_FIELDS = [
     "unsafe_authority_accept_count",
     "blocked_authority_claim_count",
+    "authority_control_case_count",
+    "authority_valid_accept_count",
+    "authority_valid_reject_count",
+    "authority_invalid_accept_count",
+    "authority_invalid_reject_count",
     "authority_false_accept_count",
     "authority_false_reject_count",
     "real_authority_grant_events",
@@ -105,9 +111,12 @@ class JsonSchemaContractTests(unittest.TestCase):
         self.assertEqual(properties["source_refs"]["items"], {"$ref": "#/$defs/source_ref"})
         source_ref = schema["$defs"]["source_ref"]
         self.assertEqual(source_ref["required"], ["ref_type", "ref_id", "relationship"])
-        self.assertEqual(properties["grants_authority"], {"const": False})
-        self.assertEqual(properties["authority_effect"], {"const": "none"})
+        self.assertEqual(properties["grants_authority"], {"type": "boolean"})
+        self.assertEqual(properties["authority_effect"], {"enum": ["none", "synthetic_authority_fixture"]})
         self.assertEqual(properties["candidate_state_not_authority"], {"const": True})
+        conditional_text = json.dumps(schema["allOf"], sort_keys=True)
+        self.assertIn("synthetic_authority_fixture", conditional_text)
+        self.assertIn("authority.synthetic_grant.recorded", conditional_text)
 
     def test_event_schema_requires_source_refs_for_derived_events(self):
         schema = self.load_schema("event-envelope.schema.json")
@@ -193,7 +202,7 @@ class JsonSchemaContractTests(unittest.TestCase):
                 self.assertIn(field_name, required)
                 self.assertIn(field_name, schema["properties"])
         self.assertEqual(schema["properties"]["real_authority_grant_events"], {"const": 0})
-        self.assertEqual(schema["properties"]["synthetic_authority_fixture_events"], {"const": 0})
+        self.assertEqual(schema["properties"]["synthetic_authority_fixture_events"], {"type": "integer", "minimum": 0})
         self.assertEqual(schema["properties"]["authority_state_changed_by_invalid_claim"], {"const": False})
 
     def test_evaluator_finding_schema_matches_plan_minimum(self):
@@ -222,6 +231,35 @@ class JsonSchemaContractTests(unittest.TestCase):
         )
         self.assertIn("source_event_ids", finding["properties"])
         self.assertEqual(finding["properties"]["source_event_ids"]["minItems"], 1)
+
+    def test_evaluator_report_schema_tightens_synthetic_control_findings(self):
+        schema = self.load_schema("authority-evaluator-report.schema.json")
+        control_finding = schema["$defs"]["authority_control_finding"]
+
+        self.assertEqual(schema["properties"]["authority_control_findings"]["items"], {"$ref": "#/$defs/authority_control_finding"})
+        self.assertFalse(control_finding["additionalProperties"])
+        for field_name in [
+            "case_id",
+            "grant_id",
+            "event_id",
+            "actor_id",
+            "action",
+            "target",
+            "scope",
+            "decision",
+            "oracle_authority_valid",
+            "oracle_match",
+            "formal_grant_present",
+            "channel_member",
+            "failure_reason",
+            "human_explanation",
+            "synthetic_sandbox_only",
+        ]:
+            with self.subTest(field_name=field_name):
+                self.assertIn(field_name, control_finding["required"])
+                self.assertIn(field_name, control_finding["properties"])
+        self.assertEqual(control_finding["properties"]["decision"]["enum"], ["accepted", "rejected"])
+        self.assertEqual(control_finding["properties"]["synthetic_sandbox_only"], {"const": True})
 
     def test_schema_readme_mentions_no_authority_invariant(self):
         readme_text = (SCHEMAS_DIR / "README.md").read_text(encoding="utf-8").lower()

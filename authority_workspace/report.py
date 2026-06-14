@@ -1,8 +1,9 @@
 """Human-reviewable replay timeline and Markdown reports.
 
 Task 13 reports are deliberately non-authoritative.  They summarize immutable
-runner/evaluator artifacts for review without creating any positive authority
-path or mutating authority state.
+runner/evaluator artifacts for review without themselves granting authority or
+mutating authority state.  v0.1 synthetic fixture reports may describe scoped
+sandbox authority transitions, always with no-real-world-authority guards.
 """
 
 from __future__ import annotations
@@ -165,6 +166,7 @@ def _run_report_markdown(
     evaluator_report: dict[str, Any],
 ) -> str:
     findings_by_claim_id = {finding["claim_id"]: finding for finding in evaluator_report.get("findings", [])}
+    has_synthetic_sandbox_authority = authority_state.get("synthetic_sandbox_only") is True
     lines = [
         NON_AUTHORITY_DISCLAIMER,
         "",
@@ -173,19 +175,47 @@ def _run_report_markdown(
         f"- Non-authoritative scenario: `{_inline_markdown(manifest['scenario_id'])}`",
         f"- Non-authority status: {authority_state['authority_status']}",
         f"- Blocked authority claims: {len(claims)}",
-        f"- grants_authority: false",
-        f"- authority_effect: none",
+        f"- grants_authority: {str(authority_state.get('grants_authority', False)).lower()}",
+        f"- authority_effect: {_inline_markdown(authority_state.get('authority_effect', 'none'))}",
+        f"- synthetic_sandbox_only: {str(authority_state.get('synthetic_sandbox_only', False)).lower()}",
+        f"- non-authoritative real_world_authority: {str(authority_state.get('real_world_authority', False)).lower()}",
         f"- candidate_state_not_authority: true",
         "",
         "## Deterministic-v0 limitations",
         "",
         "- Non-authority deterministic-v0 limitation: no live model resistance evidence.",
-        "- Non-authority deterministic-v0 limitation: no positive authority path.",
         "- Non-authority deterministic-v0 limitation: raw-event-only claim extraction.",
         "",
-        "## Blocked authority claims",
-        "",
     ]
+    if has_synthetic_sandbox_authority:
+        lines.extend(
+            [
+                "## Sandbox-only synthetic authority transitions",
+                "",
+                "The v0.1 synthetic fixture granted scoped sandbox authority only; it does not grant real-world authority.",
+                "",
+            ]
+        )
+        for transition in authority_state.get("authority_transitions", []):
+            lines.extend(
+                [
+                    f"- Synthetic transition `{_inline_markdown(transition['transition_id'])}`",
+                    f"  - case_id: {_inline_markdown(transition['case_id'])}",
+                    f"  - grant_id: {_inline_markdown(transition['grant_id'])}",
+                    f"  - actor_id: {_inline_markdown(transition['actor_id'])}",
+                    f"  - action: {_inline_markdown(transition['action'])}",
+                    f"  - target: {_inline_markdown(transition['target'])}",
+                    f"  - scope: {_inline_markdown(transition['scope'])}",
+                    f"  - authority_effect: {_inline_markdown(transition['authority_effect'])}",
+                    f"  - synthetic_sandbox_only: {str(transition.get('synthetic_sandbox_only', False)).lower()}",
+                    f"  - real_world_authority: {str(transition.get('real_world_authority', False)).lower()}",
+                ]
+            )
+        lines.append("")
+    else:
+        lines.extend(["- Non-authority deterministic-v0 limitation: no positive authority path.", ""])
+
+    lines.extend(["## Blocked authority claims", ""])
     if not claims:
         lines.extend(["No blocked authority claims were detected.", ""])
     for claim in claims:

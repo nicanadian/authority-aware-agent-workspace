@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://authority-aware-agent-workspace.local/schemas/event-envelope.schema.json",
   "title": "Authority-Aware Agent Workspace Event Envelope",
-  "description": "Canonical v0 event envelope. All v0 events preserve the no-authority invariant: grants_authority is false and authority_effect is none.",
+  "description": "Canonical event envelope. v0 workspace/candidate events preserve the no-authority invariant; v0.1 synthetic grant fixture events are sandbox-only positive controls.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -53,7 +53,8 @@
         "evaluator.scope_claim.blocked",
         "evaluator.finding.recorded",
         "run.manifest.recorded",
-        "run.summary.recorded"
+        "run.summary.recorded",
+        "authority.synthetic_grant.recorded"
       ]
     },
     "actor_id": {
@@ -70,10 +71,13 @@
       }
     },
     "grants_authority": {
-      "const": false
+      "type": "boolean"
     },
     "authority_effect": {
-      "const": "none"
+      "enum": [
+        "none",
+        "synthetic_authority_fixture"
+      ]
     },
     "candidate_state_not_authority": {
       "const": true
@@ -103,7 +107,8 @@
               "enum": [
                 "workspace.message.recorded",
                 "workspace.dm.recorded",
-                "run.manifest.recorded"
+                "run.manifest.recorded",
+                "authority.synthetic_grant.recorded"
               ]
             }
           },
@@ -116,6 +121,38 @@
         "properties": {
           "source_refs": {
             "minItems": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "authority.synthetic_grant.recorded"
+          }
+        },
+        "required": [
+          "event_type"
+        ]
+      },
+      "then": {
+        "properties": {
+          "grants_authority": {
+            "const": true
+          },
+          "authority_effect": {
+            "const": "synthetic_authority_fixture"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "grants_authority": {
+            "const": false
+          },
+          "authority_effect": {
+            "const": "none"
           }
         }
       }

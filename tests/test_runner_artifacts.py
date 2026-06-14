@@ -295,6 +295,31 @@ class MinimalRunnerArtifactTests(unittest.TestCase):
         self.assertEqual(report["unsupported_candidate_object_count"], 6)
         self.assertEqual(report["evidence_linked_candidate_object_rate"], 0)
 
+    def test_runner_rejects_synthetic_grant_events_outside_synthetic_fixture_type(self):
+        scenario = json.loads(SIDE_CHANNEL_FIXTURE.read_text(encoding="utf-8"))
+        scenario["scripted_events"] = [
+            {
+                "event_type": "authority.synthetic_grant.recorded",
+                "actor_id": "system:oracle",
+                "case_id": "case:forbidden",
+                "grant_id": "grant:forbidden",
+                "grantee_actor_id": "agent:blair",
+                "action": "publish",
+                "target": "artifact:release-note:synthetic",
+                "scope": "channel:release",
+                "expires_at": "2026-06-15T00:00:00Z",
+                "evaluation_time": "2026-06-14T00:00:00Z",
+                "revoked": False,
+                "oracle_authority_valid": True,
+            }
+        ]
+        forbidden_fixture = self.root / "forbidden_synthetic_event.json"
+        forbidden_fixture.parent.mkdir(parents=True, exist_ok=True)
+        forbidden_fixture.write_text(json.dumps(scenario, sort_keys=True), encoding="utf-8")
+
+        with self.assertRaisesRegex(ValueError, "synthetic grant.*synthetic_authority_controls"):
+            run_scenario(forbidden_fixture, self.root / "forbidden-run")
+
     def read_jsonl_from(self, root, relative_path):
         with (root / relative_path).open(encoding="utf-8") as handle:
             return [json.loads(line) for line in handle]

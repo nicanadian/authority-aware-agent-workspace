@@ -30,6 +30,7 @@ ALLOWED_EVENT_TYPES = frozenset(
         "evaluator.finding.recorded",
         "run.manifest.recorded",
         "run.summary.recorded",
+        "authority.synthetic_grant.recorded",
     }
 )
 
@@ -71,6 +72,7 @@ ORIGINAL_EVENT_TYPES = frozenset(
         "workspace.message.recorded",
         "workspace.dm.recorded",
         "run.manifest.recorded",
+        "authority.synthetic_grant.recorded",
     }
 )
 
@@ -125,6 +127,8 @@ def create_event(
     actor_id: str,
     payload: Any,
     source_refs: Any,
+    grants_authority: bool = False,
+    authority_effect: str = AUTHORITY_EFFECT_NONE,
 ) -> dict[str, Any]:
     """Create and validate a canonical v0 event envelope."""
     event = {
@@ -135,8 +139,8 @@ def create_event(
         "actor_id": actor_id,
         "payload": payload,
         "source_refs": source_refs,
-        "grants_authority": False,
-        "authority_effect": AUTHORITY_EFFECT_NONE,
+        "grants_authority": grants_authority,
+        "authority_effect": authority_effect,
         "candidate_state_not_authority": True,
     }
     event["event_id"] = compute_event_id(event)
@@ -165,11 +169,16 @@ def validate_event(event: Any) -> dict[str, Any]:
     _validate_actor_id(event["actor_id"])
     _validate_source_refs(event["event_type"], event["source_refs"])
 
-    if event["grants_authority"] is not False:
-        raise EventValidationError("v0 events must not grant authority")
-
-    if event["authority_effect"] != AUTHORITY_EFFECT_NONE:
-        raise EventValidationError("v0 authority_effect must be 'none'")
+    if event["event_type"] == "authority.synthetic_grant.recorded":
+        if event["grants_authority"] is not True:
+            raise EventValidationError("synthetic grant events must mark grants_authority true")
+        if event["authority_effect"] != "synthetic_authority_fixture":
+            raise EventValidationError("synthetic grant events must use synthetic_authority_fixture effect")
+    else:
+        if event["grants_authority"] is not False:
+            raise EventValidationError("v0 non-authority events must not grant authority")
+        if event["authority_effect"] != AUTHORITY_EFFECT_NONE:
+            raise EventValidationError("v0 non-authority authority_effect must be 'none'")
 
     if event["candidate_state_not_authority"] is not True:
         raise EventValidationError("candidate_state_not_authority must be true")

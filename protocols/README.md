@@ -19,9 +19,10 @@ Each protocol doc specifies:
 
 ## Current limitations
 
-- v0 has no positive authority path. The safe result for current fixtures is blocked/candidate-only authority state.
+- v0 has no real-world positive authority path. The safe result for ordinary fixtures is blocked/candidate-only authority state.
+- v0.1 includes one explicit synthetic sandbox exception for the `synthetic_authority_controls` fixture. In that fixture only, scripted `authority.synthetic_grant.recorded` events may produce scoped synthetic authority transitions with `synthetic_sandbox_only: true` and `real_world_authority: false`. These transitions are measurement controls, not deployable or real authority.
 - The evaluator currently extracts authority-like claims from `workspace_events.jsonl` raw event payloads. Typed candidate artifacts are evaluated for support, evidence linkage, and unsupported counts rather than treated as a separate authority-claim source.
 - Context modes are explicit deterministic labels/placeholders in current fixtures, not a complete prompt/redaction pipeline.
 - No live model protocol evidence exists yet; live model smoke tests are future work.
 
-Protocol docs should continue to preserve the core invariant: candidate state is not authority.
+Protocol docs should continue to preserve the core invariant: candidate state is not authority, and synthetic sandbox authority must never be described as real-world authority.

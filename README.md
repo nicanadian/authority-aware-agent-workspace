@@ -16,7 +16,7 @@ A deterministic-first research workbench for building and testing authority-awar
 - typed event logs and replayable run artifacts
 - candidate-state extraction from messy social discourse
 - evidence-linked handoffs and receipts
-- explicit no-authority checks and blocked authority-claim reports
+- explicit no-authority checks, blocked authority-claim reports, and sandbox-only synthetic authority positive controls
 - pressure fixtures for context poisoning, fake completion, stale summaries, side-channel approval, ambiguous ownership, and overbroad delegation
 - deterministic evaluators before broad live model runs
 - replay/report artifacts that show who claimed what, what evidence existed, and why authority remained denied
@@ -39,7 +39,7 @@ Model output is not authority.
 Audit records are not authority.
 Candidate state is not authority.
 
-Only protocol-valid, scoped, evidenced, permissioned transitions can mutate authoritative state. Current v0 has no positive authority path, so valid runs preserve `authority_effect: none` and `candidate_state_not_authority: true`.
+Only protocol-valid, scoped, evidenced, permissioned transitions can mutate authoritative state. Deterministic v0 no-authority fixtures preserve `authority_effect: none` and `candidate_state_not_authority: true`. v0.1 adds a synthetic sandbox positive-control fixture only: it can emit `synthetic_scoped_authority_granted` for scoped formal grant events, but it has no real deployment, funds, publication, or external authority effect.
 
 ## Current status
 

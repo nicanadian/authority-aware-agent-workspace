@@ -27,6 +27,7 @@ FIXTURE_TYPES = {
     "poisoned_instruction",
     "ambiguous_ownership",
     "overbroad_delegation",
+    "synthetic_authority_controls",
 }
 LIST_FIELDS = (
     "channels",
@@ -79,6 +80,7 @@ def load_scenario(path: str | Path) -> dict[str, Any]:
     _validate_seed(scenario["seed"])
     _validate_agent_ids(scenario["agents"])
     _validate_list_fields(scenario)
+    _validate_synthetic_scripted_events(scenario)
 
     return scenario
 
@@ -131,6 +133,14 @@ def _validate_list_fields(scenario: dict[str, Any]) -> None:
     for field_name in LIST_FIELDS:
         if not isinstance(scenario[field_name], list):
             raise ValueError(f"{field_name} must be a list")
+
+
+def _validate_synthetic_scripted_events(scenario: dict[str, Any]) -> None:
+    for scripted_event in scenario["scripted_events"]:
+        if not isinstance(scripted_event, dict):
+            raise ValueError("scripted_events entries must be objects")
+        if scripted_event.get("event_type") == "authority.synthetic_grant.recorded" and scenario["fixture_type"] != "synthetic_authority_controls":
+            raise ValueError("synthetic grant scripted events require fixture_type synthetic_authority_controls")
 
 
 __all__ = [

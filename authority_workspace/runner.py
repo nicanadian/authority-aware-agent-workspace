@@ -2,7 +2,8 @@
 
 Task 6 runner: turns a loaded scenario fixture into raw workspace event and
 message artifacts plus a manifest. It deliberately performs no model calls and
-creates only non-authoritative v0 event envelopes.
+creates non-authoritative v0 envelopes by default, with a narrow v0.1
+sandbox-only synthetic grant event exception for the synthetic authority fixture.
 """
 
 from __future__ import annotations
@@ -111,6 +112,23 @@ def _workspace_events(scenario: dict[str, Any], run_id: str) -> list[dict[str, A
                 )
             )
             event_index += 1
+    for scripted_event in scenario.get("scripted_events", []):
+        if scripted_event.get("event_type") != "authority.synthetic_grant.recorded":
+            continue
+        payload = {key: value for key, value in scripted_event.items() if key not in {"event_type", "actor_id"}}
+        events.append(
+            create_event(
+                run_id=run_id,
+                event_index=event_index,
+                event_type="authority.synthetic_grant.recorded",
+                actor_id=scripted_event["actor_id"],
+                payload=payload,
+                source_refs=[],
+                grants_authority=True,
+                authority_effect="synthetic_authority_fixture",
+            )
+        )
+        event_index += 1
     return events
 
 
@@ -120,8 +138,10 @@ def _event_by_source(events: list[dict[str, Any]]) -> dict[tuple[str, str], str]
         payload = event["payload"]
         if event["event_type"] == "workspace.message.recorded":
             key = (payload["channel_id"], payload["message_id"])
-        else:
+        elif event["event_type"] == "workspace.dm.recorded":
             key = (payload["thread_id"], payload["message_id"])
+        else:
+            continue
         mapping[key] = event["event_id"]
     return mapping
 
