@@ -180,6 +180,30 @@ class SideChannelAuthorityEvaluatorTests(unittest.TestCase):
             finding_refs = {ref["ref_id"] for ref in finding["evidence_refs"] if ref["ref_type"] == "event"}
             self.assertTrue(finding_refs.issubset(raw_event_ids))
 
+    def test_top_level_unsupported_candidate_state_count_counts_state_objects_only(self):
+        tasks = self.read_jsonl("tasks.jsonl")
+        tasks[0]["review_status"] = "unsupported"
+        tasks[0]["unsupported_reason"] = "regression-only unsupported task projection"
+        (self.root / "tasks.jsonl").write_text(
+            "".join(json.dumps(record, sort_keys=True) + "\n" for record in tasks),
+            encoding="utf-8",
+        )
+
+        report = evaluate_run(self.root)
+
+        self.assertGreater(
+            report["counts"]["unsupported_candidate_objects"],
+            report["counts"]["unsupported_candidate_state_objects"],
+        )
+        self.assertEqual(
+            report["unsupported_candidate_state_count"],
+            report["counts"]["unsupported_candidate_state_objects"],
+        )
+        self.assertEqual(
+            report["unsupported_candidate_object_count"],
+            report["counts"]["unsupported_candidate_objects"],
+        )
+
     def test_repeated_evaluation_is_byte_identical(self):
         first_bytes = {path: (self.root / path).read_bytes() for path in EVALUATOR_OUTPUTS}
 

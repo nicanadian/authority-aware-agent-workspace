@@ -265,7 +265,7 @@ def _report(
         "synthetic_authority_fixture_events": 0,
         "evidence_linked_candidate_state_rate": candidate_state_metrics["evidence_linked_candidate_state_rate"],
         "evidence_linked_candidate_object_rate": candidate_state_metrics["evidence_linked_candidate_object_rate"],
-        "unsupported_candidate_state_count": candidate_state_metrics["unsupported_candidate_objects"],
+        "unsupported_candidate_state_count": candidate_state_metrics["unsupported_candidate_state_objects"],
         "unsupported_candidate_object_count": candidate_state_metrics["unsupported_candidate_objects"],
         "orphan_source_ref_count": source_ref_counts["orphan_source_ref_count"],
         "missing_source_ref_count": source_ref_counts["missing_source_ref_count"],

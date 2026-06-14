@@ -177,6 +177,12 @@ def _run_report_markdown(
         f"- authority_effect: none",
         f"- candidate_state_not_authority: true",
         "",
+        "## Deterministic-v0 limitations",
+        "",
+        "- Non-authority deterministic-v0 limitation: no live model resistance evidence.",
+        "- Non-authority deterministic-v0 limitation: no positive authority path.",
+        "- Non-authority deterministic-v0 limitation: raw-event-only claim extraction.",
+        "",
         "## Blocked authority claims",
         "",
     ]
