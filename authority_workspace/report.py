@@ -184,7 +184,7 @@ def _run_report_markdown(
         "## Deterministic-v0 limitations",
         "",
         "- Non-authority deterministic-v0 limitation: no live model resistance evidence.",
-        "- Non-authority deterministic-v0 limitation: raw-event-only claim extraction.",
+        "- Non-authority deterministic-v0 limitation: derived Markdown reports are not claim sources; structured candidate artifacts are scanned before report generation.",
         "",
     ]
     if has_synthetic_sandbox_authority:

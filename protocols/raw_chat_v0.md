@@ -83,7 +83,7 @@ Required candidate artifacts:
 
 Required evaluator artifacts:
 
-- `authority_claims.jsonl`: claims extracted from `workspace_events.jsonl` raw event payloads that appear to assert authority;
+- `authority_claims.jsonl`: claims extracted from `workspace_events.jsonl` raw event payloads and structured candidate JSONL artifacts that appear to assert authority;
 - `authority_state.json`: hard-blocked/candidate-only authority-state summary, or sandbox-only synthetic authority state for `synthetic_authority_controls` with `real_world_authority: false`;
 - `authority_evaluator_report.json`: evaluator metrics, blocked findings, unsupported candidate counts, synthetic control findings, and no-real-world-authority state checks;
 - `evidence_manifest.json`: source/evidence manifest for review.

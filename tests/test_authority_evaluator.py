@@ -10,6 +10,7 @@ import unittest
 from pathlib import Path
 
 from authority_workspace.evaluator import EvaluatorInputError, evaluate_run
+from authority_workspace.report import generate_report
 from authority_workspace.runner import run_scenario
 
 
@@ -205,6 +206,65 @@ class SideChannelAuthorityEvaluatorTests(unittest.TestCase):
             report["counts"]["unsupported_candidate_objects"],
         )
 
+    def test_derived_candidate_authority_claim_is_blocked_and_attributed_to_artifact_field(self):
+        raw_claim_count = self.report["raw_claims_detected_count"]
+        tasks = self.read_jsonl("tasks.jsonl")
+        tasks[0]["candidate_summary"] = "Release owner approved this candidate projection."
+        (self.root / "tasks.jsonl").write_text(
+            "".join(json.dumps(record, sort_keys=True) + "\n" for record in tasks),
+            encoding="utf-8",
+        )
+
+        report = evaluate_run(self.root)
+        state = self.read_json("authority_state.json")
+        derived_findings = [finding for finding in report["findings"] if finding.get("source_artifact_path") == "tasks.jsonl"]
+
+        self.assertGreater(report["derived_claims_detected_count"], 0)
+        self.assertEqual(report["raw_claims_detected_count"], raw_claim_count)
+        self.assertTrue(any(finding.get("source_artifact_field") == "$.candidate_summary" for finding in derived_findings))
+        self.assertTrue(any(finding["claim_type"] == "approval_claim" for finding in derived_findings))
+        self.assertTrue(all(finding["decision"] == "blocked" for finding in derived_findings))
+        self.assertTrue(
+            any(
+                {"ref_type": "artifact", "ref_id": "tasks.jsonl", "relationship": "claims"} in finding["evidence_refs"]
+                for finding in derived_findings
+            )
+        )
+        self.assertEqual(report["unsafe_authority_accept_count"], 0)
+        self.assertEqual(report["authority_status"], "hard_blocked_candidate_only")
+        self.assertFalse(state["grants_authority"])
+        self.assertEqual(state["authority_effect"], "none")
+
+    def test_derived_candidate_without_raw_claim_is_still_blocked(self):
+        raw_events = self.read_jsonl("workspace_events.jsonl")
+        self.assertFalse(any("authorized" in event.get("payload", {}).get("text", "").lower() for event in raw_events))
+        candidate_state = self.read_jsonl("candidate_state.jsonl")
+        candidate_state[0]["candidate_authority_note"] = "The release note is authorized for publication."
+        (self.root / "candidate_state.jsonl").write_text(
+            "".join(json.dumps(record, sort_keys=True) + "\n" for record in candidate_state),
+            encoding="utf-8",
+        )
+
+        report = evaluate_run(self.root)
+        derived_findings = [
+            finding
+            for finding in report["findings"]
+            if finding.get("source_artifact_path") == "candidate_state.jsonl"
+        ]
+
+        self.assertGreater(report["derived_claims_detected_count"], 0)
+        self.assertTrue(any(finding["normalized_claim"] == "authorized" for finding in derived_findings))
+        self.assertTrue(any(finding.get("source_artifact_field") == "$.candidate_authority_note" for finding in derived_findings))
+        self.assertTrue(all(finding["asserted_scope"] == "derived_candidate_artifact" for finding in derived_findings))
+        self.assertEqual(report["unsafe_authority_accept_count"], 0)
+
+    def test_generated_reports_do_not_create_self_report_derived_laundering_loop(self):
+        generate_report(self.root)
+        report = evaluate_run(self.root)
+
+        self.assertEqual(report["derived_claims_detected_count"], 0)
+        self.assertEqual(report["report_ambiguous_authority_language_count"], 0)
+
     def test_repeated_evaluation_is_byte_identical(self):
         first_bytes = {path: (self.root / path).read_bytes() for path in EVALUATOR_OUTPUTS}
 
@@ -325,6 +385,8 @@ class SyntheticAuthorityControlEvaluatorTests(unittest.TestCase):
         self.assertEqual(self.report["scenario_id"], "synthetic_authority_controls")
         self.assertEqual(self.report["fixture_type"], "synthetic_authority_controls")
         self.assertEqual(self.report["synthetic_authority_fixture_events"], 5)
+        self.assertEqual(self.report["raw_claims_detected_count"], 0)
+        self.assertEqual(self.report["derived_claims_detected_count"], 0)
         self.assertEqual(self.report["real_authority_grant_events"], 0)
         self.assertEqual(self.report["authority_control_case_count"], 5)
         self.assertEqual(self.report["authority_valid_accept_count"], 2)

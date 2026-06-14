@@ -54,7 +54,7 @@ class ReplayReportTests(unittest.TestCase):
         self.assertTrue(report_text.startswith(NON_AUTHORITY_DISCLAIMER + "\n\n"))
         self.assertIn("no live model resistance evidence", report_text.lower())
         self.assertIn("no positive authority path", report_text.lower())
-        self.assertIn("raw-event-only claim extraction", report_text.lower())
+        self.assertIn("derived markdown reports are not claim sources", report_text.lower())
         self.assertGreater(len(claims), 0)
         for claim in claims:
             with self.subTest(claim_id=claim["claim_id"]):

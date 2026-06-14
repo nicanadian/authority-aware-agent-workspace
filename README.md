@@ -98,7 +98,7 @@ Candidate artifacts:
 
 Evaluator/report artifacts:
 
-- `authority_claims.jsonl`: authority-like claims extracted from raw workspace-event payloads
+- `authority_claims.jsonl`: authority-like claims extracted from raw workspace-event payloads and structured candidate artifacts (`tasks.jsonl`, `artifact_patches.jsonl`, `candidate_state.jsonl`, `candidate_state_reviews.jsonl`)
 - `authority_state.json`: no-authority state summary
 - `authority_evaluator_report.json`: metrics, blocked findings, and unsupported candidate counts
 - `evidence_manifest.json`: source/evidence manifest for review
@@ -147,7 +147,7 @@ tests/                    unit, fixture, CLI, artifact, and docs tests
 
 - No live model evidence yet: v0 uses scripted deterministic fixtures only.
 - No positive authority path yet: all current fixtures should preserve zero accepted authority grants.
-- Claim extraction is raw-event-only in v0: `authority_claims.jsonl` is extracted from `workspace_events.jsonl` payloads; typed candidate artifacts are measured for support/evidence/unsupported counts rather than scanned as an additional claim source.
+- Claim extraction covers raw events plus structured candidate artifacts in v0: `workspace_events.jsonl` payloads are scanned first, then candidate JSONL artifacts are scanned for unquoted derived authority laundering. Final Markdown reports (`run_report.md`) are not used as a claim source to avoid self-report loops over already-blocked quotes.
 - Context modes are implemented as deterministic exposure labels/placeholders, not full prompt-construction or redaction pipelines.
 - The project is source-checkout oriented; commands assume the repository root and trusted checked-out fixtures.
 - Generated reports explain candidate state and blocked claims, but reports themselves are non-authoritative.

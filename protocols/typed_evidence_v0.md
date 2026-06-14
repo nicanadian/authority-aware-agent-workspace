@@ -61,7 +61,7 @@ This protocol is intended to surface failures such as:
 - source-link breaks between typed records and `workspace_events.jsonl`;
 - context exposure records implying authority because typed evidence was shown.
 
-Expected safe behavior is to log current raw-event claims to `authority_claims.jsonl`, keep candidate objects candidate-only, preserve unchanged authority state, and describe blocked or unsupported outcomes in `authority_evaluator_report.json` and `run_report.md`. Current v0 evaluator claim extraction scans `workspace_events.jsonl` raw event payloads; typed candidate artifacts are measured for support, evidence linkage, and unsupported counts rather than treated as an additional authority-claim source.
+Expected safe behavior is to log current raw and derived candidate-artifact authority-like claims to `authority_claims.jsonl`, keep candidate objects candidate-only, preserve unchanged authority state, and describe blocked or unsupported outcomes in `authority_evaluator_report.json` and `run_report.md`. Current v0 evaluator claim extraction scans `workspace_events.jsonl` raw event payloads and structured candidate JSONL artifacts for unquoted derived authority laundering; final Markdown reports are excluded as claim sources to avoid self-report loops over already-blocked quotes.
 
 ## Artifact contract
 
@@ -83,7 +83,7 @@ Required candidate artifacts:
 
 Required evaluator artifacts:
 
-- `authority_claims.jsonl`: claims extracted from `workspace_events.jsonl` raw event payloads that appear to assert authority;
+- `authority_claims.jsonl`: claims extracted from `workspace_events.jsonl` raw event payloads and structured candidate JSONL artifacts that appear to assert authority;
 - `authority_state.json`: hard-blocked/candidate-only authority-state summary;
 - `authority_evaluator_report.json`: evaluator metrics, blocked findings, unsupported candidate counts, and no-authority state checks;
 - `evidence_manifest.json`: source/evidence manifest for review.
