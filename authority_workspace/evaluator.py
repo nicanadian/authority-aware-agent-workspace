@@ -47,6 +47,12 @@ _CANDIDATE_INPUT_PATHS = (
     "candidate_state.jsonl",
     "candidate_state_reviews.jsonl",
 )
+_OPTIONAL_DERIVED_INPUT_PATHS = (
+    "live_model_outputs.jsonl",
+)
+_OPTIONAL_EVIDENCE_INPUT_PATHS = (
+    "live_smoke_trace.json",
+)
 _DERIVED_SCAN_SAFE_KEYS = {
     "authority_effect",
     "candidate_state_not_authority",
@@ -217,7 +223,7 @@ def _derived_authority_claims(root: Path) -> list[dict[str, Any]]:
     """
 
     claims: list[dict[str, Any]] = []
-    for relative_path in _CANDIDATE_INPUT_PATHS:
+    for relative_path in (*_CANDIDATE_INPUT_PATHS, *_OPTIONAL_DERIVED_INPUT_PATHS):
         path = root / relative_path
         if not path.exists():
             continue
@@ -284,11 +290,16 @@ def _blocked_claim(
     return blocked
 
 
-def _strip_derived_safe_keys(value: Any) -> Any:
+def _strip_derived_safe_keys(value: Any, *, preserve_keys: bool = False) -> Any:
     if isinstance(value, dict):
-        return {key: _strip_derived_safe_keys(child) for key, child in value.items() if key not in _DERIVED_SCAN_SAFE_KEYS}
+        stripped: dict[str, Any] = {}
+        for key, child in value.items():
+            if not preserve_keys and key in _DERIVED_SCAN_SAFE_KEYS:
+                continue
+            stripped[key] = _strip_derived_safe_keys(child, preserve_keys=preserve_keys or key == "provider_output")
+        return stripped
     if isinstance(value, list):
-        return [_strip_derived_safe_keys(child) for child in value]
+        return [_strip_derived_safe_keys(child, preserve_keys=preserve_keys) for child in value]
     return value
 
 
@@ -610,7 +621,8 @@ def _source_ref_counts(
 
 
 def _evidence_manifest(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
-    paths = (*_INITIAL_INPUT_PATHS, *_CANDIDATE_INPUT_PATHS, "authority_claims.jsonl", "authority_state.json", "authority_evaluator_report.json")
+    optional_paths = tuple(path for path in (*_OPTIONAL_DERIVED_INPUT_PATHS, *_OPTIONAL_EVIDENCE_INPUT_PATHS) if (root / path).exists())
+    paths = (*_INITIAL_INPUT_PATHS, *_CANDIDATE_INPUT_PATHS, *optional_paths, "authority_claims.jsonl", "authority_state.json", "authority_evaluator_report.json")
     artifacts = build_manifest_entries(root, paths)
     return {
         "schema_version": "aaaw.evidence_manifest.v1",

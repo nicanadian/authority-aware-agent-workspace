@@ -77,6 +77,19 @@ python3.11 -m authority_workspace.cli evaluate runs/side_channel_approval
 
 The `run` command writes deterministic artifacts. The `evaluate` command validates trusted fixture provenance, re-checks derived outputs, and rewrites evaluator/report artifacts for the run directory.
 
+A bounded one-call live-smoke plumbing path is also available. It requires an explicit provider command as a JSON argv array, executes it without a shell, sends one materialized context JSON request on stdin, and records the result as non-authoritative evidence:
+
+```bash
+python3.11 -m authority_workspace.cli live-smoke \
+  scenarios/fixtures/side_channel_approval.json \
+  --out runs/side_channel_live_smoke \
+  --provider-command-json '["/absolute/path/to/provider-wrapper"]' \
+  --timeout-seconds 10 \
+  --max-context-bytes 8192
+```
+
+Provider output is written to `live_model_outputs.jsonl`, scanned for authority-like claims, and blocked like other derived artifacts. The smoke path does not grant authority and is intended only to validate plumbing against one bounded context.
+
 ## Artifact overview
 
 A v0 run writes a deterministic artifact surface:
@@ -88,6 +101,7 @@ Initial/source artifacts:
 - `channel_messages.jsonl`: channel/message projection linked to raw workspace events
 - `dm_messages.jsonl`: DM projection linked to raw workspace events
 - `context_exposure.jsonl`: deterministic record of exposed context mode/placeholders
+- `materialized_contexts.jsonl`: deterministic per-event context surfaces used for prompt/live-smoke plumbing
 
 Candidate artifacts:
 
@@ -98,7 +112,7 @@ Candidate artifacts:
 
 Evaluator/report artifacts:
 
-- `authority_claims.jsonl`: authority-like claims extracted from raw workspace-event payloads and structured candidate artifacts (`tasks.jsonl`, `artifact_patches.jsonl`, `candidate_state.jsonl`, `candidate_state_reviews.jsonl`)
+- `authority_claims.jsonl`: authority-like claims extracted from raw workspace-event payloads and structured candidate artifacts (`tasks.jsonl`, `artifact_patches.jsonl`, `candidate_state.jsonl`, `candidate_state_reviews.jsonl`, and optional `live_model_outputs.jsonl`)
 - `authority_state.json`: no-authority state summary
 - `authority_evaluator_report.json`: metrics, blocked findings, and unsupported candidate counts
 - `evidence_manifest.json`: source/evidence manifest for review
@@ -145,9 +159,9 @@ tests/                    unit, fixture, CLI, artifact, and docs tests
 
 ## Limitations
 
-- No live model evidence yet: v0 uses scripted deterministic fixtures only.
-- No positive authority path yet: all current fixtures should preserve zero accepted authority grants.
-- Claim extraction covers raw events plus structured candidate artifacts in v0: `workspace_events.jsonl` payloads are scanned first, then candidate JSONL artifacts are scanned for unquoted derived authority laundering. Final Markdown reports (`run_report.md`) are not used as a claim source to avoid self-report loops over already-blocked quotes.
-- Context modes are implemented as deterministic exposure labels/placeholders, not full prompt-construction or redaction pipelines.
+- One bounded live-smoke plumbing path exists, but there is no broad live-model benchmark or provider-specific adapter yet.
+- Positive authority exists only in the synthetic sandbox fixture; it has no real-world authority effect.
+- Claim extraction covers raw events plus structured candidate/live-smoke artifacts in v0.1: `workspace_events.jsonl` payloads are scanned first, then candidate JSONL artifacts and optional `live_model_outputs.jsonl` are scanned for unquoted derived authority laundering. Final Markdown reports (`run_report.md`) are not used as a claim source to avoid self-report loops over already-blocked quotes.
+- Context modes now produce deterministic materialized context surfaces, but they are still fixture/replay surfaces rather than production prompt pipelines.
 - The project is source-checkout oriented; commands assume the repository root and trusted checked-out fixtures.
 - Generated reports explain candidate state and blocked claims, but reports themselves are non-authoritative.

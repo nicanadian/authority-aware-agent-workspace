@@ -10,6 +10,8 @@ import tempfile
 from pathlib import Path
 from typing import Any, Sequence
 
+from authority_workspace.live_smoke import run_live_smoke
+
 from authority_workspace.artifacts import build_manifest_entries, write_json
 from authority_workspace.evaluator import EVALUATOR_OUTPUT_PATHS, evaluate_run
 from authority_workspace.report import REPORT_OUTPUT_PATHS, generate_report
@@ -27,6 +29,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _run_command(args.scenario, args.out)
         if args.command == "evaluate":
             return _evaluate_command(args.run_root)
+        if args.command == "live-smoke":
+            return _live_smoke_command(
+                args.scenario,
+                args.out,
+                args.provider_command_json,
+                args.timeout_seconds,
+                args.max_context_bytes,
+            )
         parser.print_usage(sys.stderr)
         return 2
     except SystemExit as exc:
@@ -47,6 +57,13 @@ def _parser() -> argparse.ArgumentParser:
 
     evaluate_parser = subparsers.add_parser("evaluate", help="re-evaluate an existing run directory")
     evaluate_parser.add_argument("run_root", type=Path)
+
+    live_parser = subparsers.add_parser("live-smoke", help="run one bounded provider call against a fixture context")
+    live_parser.add_argument("scenario", type=Path)
+    live_parser.add_argument("--out", required=True, type=Path)
+    live_parser.add_argument("--provider-command-json", help="JSON array of executable argv; required to make a live-smoke call")
+    live_parser.add_argument("--timeout-seconds", type=int, default=10)
+    live_parser.add_argument("--max-context-bytes", type=int, default=8192)
     return parser
 
 
@@ -74,6 +91,36 @@ def _evaluate_command(run_root: Path) -> int:
     manifest = _rewrite_manifest(run_root, RUN_ARTIFACT_PATHS)
     print(f"evaluated run: {run_root}")
     print(f"scenario_id: {manifest['scenario_id']}")
+    return 0
+
+
+def _live_smoke_command(
+    scenario: Path,
+    output_root: Path,
+    provider_command_json: str | None,
+    timeout_seconds: int,
+    max_context_bytes: int,
+) -> int:
+    if not scenario.is_file():
+        print(f"error: scenario not found: {scenario}", file=sys.stderr)
+        return 1
+    if provider_command_json is None:
+        print("error: --provider-command-json is required for live-smoke", file=sys.stderr)
+        return 1
+    provider_command = json.loads(provider_command_json)
+    if not isinstance(provider_command, list) or not all(isinstance(part, str) for part in provider_command):
+        print("error: --provider-command-json must be a JSON array of strings", file=sys.stderr)
+        return 1
+    manifest = run_live_smoke(
+        scenario,
+        output_root,
+        provider_command=provider_command,
+        timeout_seconds=timeout_seconds,
+        max_context_bytes=max_context_bytes,
+    )
+    print(f"wrote live smoke run: {output_root}")
+    print(f"scenario_id: {manifest['scenario_id']}")
+    print("live_smoke_calls: 1")
     return 0
 
 
