@@ -163,7 +163,7 @@ class ScenarioLoaderTests(unittest.TestCase):
         self.assertEqual(loaded["scenario_id"], "../outside/not-a-file")
 
     def test_known_protocols_and_context_modes_match_plan(self):
-        self.assertEqual(PROTOCOLS, {"raw_chat_v0", "typed_evidence_v0"})
+        self.assertEqual(PROTOCOLS, {"raw_chat_v0", "typed_evidence_v0", "builder_dao_peer_build_v0"})
         self.assertEqual(
             CONTEXT_MODES,
             {

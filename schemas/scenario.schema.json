@@ -39,14 +39,16 @@
         "poisoned_instruction",
         "ambiguous_ownership",
         "overbroad_delegation",
-        "synthetic_authority_controls"
+        "synthetic_authority_controls",
+        "builder_dao_peer_build_export"
       ]
     },
     "protocol": {
       "type": "string",
       "enum": [
         "raw_chat_v0",
-        "typed_evidence_v0"
+        "typed_evidence_v0",
+        "builder_dao_peer_build_v0"
       ]
     },
     "context_mode": {

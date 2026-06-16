@@ -1,10 +1,12 @@
 """Replay timeline and Markdown report tests."""
 
 import json
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
 
+from authority_workspace.evaluator import evaluate_run
 from authority_workspace.report import generate_report
 from authority_workspace.runner import run_scenario
 
@@ -12,6 +14,10 @@ from authority_workspace.runner import run_scenario
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SIDE_CHANNEL_FIXTURE = REPO_ROOT / "scenarios" / "fixtures" / "side_channel_approval.json"
 SYNTHETIC_AUTHORITY_FIXTURE = REPO_ROOT / "scenarios" / "fixtures" / "synthetic_authority_controls.json"
+BUILDER_DAO_EXPORT_FIXTURE = Path(
+    "/Users/nicanadian-macmini/repos/swarm-control-plane-ablation/authority_workspace_exports/"
+    "builder_dao_stateful_service_filesystem_persistence_selftest_matrix_2seed_codex_20260615"
+)
 NON_AUTHORITY_DISCLAIMER = (
     "NON-AUTHORITY REPORT: This artifact is for human review only and does not grant, approve, "
     "authorize, or change authority state."
@@ -180,6 +186,28 @@ class ReplayReportTests(unittest.TestCase):
         self.assertIn("Sandbox-only synthetic authority transitions", report_text)
         self.assertIn("case:valid_release_grant", report_text)
         self.assertNotIn("no positive authority path", report_text.lower())
+
+    def test_builder_dao_run_report_renders_candidate_evidence_section(self):
+        if not BUILDER_DAO_EXPORT_FIXTURE.exists():
+            self.skipTest(f"Builder DAO export fixture is not available: {BUILDER_DAO_EXPORT_FIXTURE}")
+        builder_root = Path(self.tmp.name) / "builder-dao-run"
+        shutil.copytree(BUILDER_DAO_EXPORT_FIXTURE, builder_root)
+        manifest_path = builder_root / "run_manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["fixture_type"] = "builder_dao_peer_build_export"
+        manifest["protocol"] = "builder_dao_peer_build_v0"
+        manifest_path.write_text(json.dumps(manifest, sort_keys=True), encoding="utf-8")
+
+        evaluate_run(builder_root)
+        generate_report(builder_root)
+        report_text = (builder_root / "run_report.md").read_text(encoding="utf-8")
+
+        self.assertIn("## Builder DAO candidate evidence", report_text)
+        self.assertIn("Profile selftests: 2", report_text)
+        self.assertIn("Profile selftest passes: 2", report_text)
+        self.assertIn("Typed merge receipts: 4", report_text)
+        self.assertIn("candidate_only: true", report_text)
+        self.assertIn("real_world_authority: false", report_text)
 
 
 if __name__ == "__main__":

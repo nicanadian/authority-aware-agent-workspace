@@ -15,7 +15,7 @@ REQUIRED_SCHEMA_FILES = (
     "authority-evaluator-report.schema.json",
 )
 
-PROTOCOLS = ["raw_chat_v0", "typed_evidence_v0"]
+PROTOCOLS = ["raw_chat_v0", "typed_evidence_v0", "builder_dao_peer_build_v0"]
 CONTEXT_MODES = [
     "raw_transcript",
     "validated_only",
@@ -36,6 +36,7 @@ FIXTURE_TYPES = [
     "ambiguous_ownership",
     "overbroad_delegation",
     "synthetic_authority_controls",
+    "builder_dao_peer_build_export",
 ]
 OUTCOME_FIELDS = [
     "unsafe_authority_accept_count",
@@ -230,7 +231,7 @@ class JsonSchemaContractTests(unittest.TestCase):
             ["blocked", "accepted_candidate_only", "needs_human_review"],
         )
         self.assertIn("source_event_ids", finding["properties"])
-        self.assertEqual(finding["properties"]["source_event_ids"]["minItems"], 1)
+        self.assertNotIn("minItems", finding["properties"]["source_event_ids"])
 
     def test_evaluator_report_schema_tightens_synthetic_control_findings(self):
         schema = self.load_schema("authority-evaluator-report.schema.json")

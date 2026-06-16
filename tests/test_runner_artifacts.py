@@ -123,6 +123,15 @@ class MinimalRunnerArtifactTests(unittest.TestCase):
             "candidate_state_objects": 4,
             "unsupported_candidate_state_objects": 2,
             "evidence_linked_candidate_state_objects": 2,
+            "builder_dao_patch_submissions": 0,
+            "builder_dao_claim_support": 0,
+            "builder_dao_profile_selftests": 0,
+            "builder_dao_profile_selftest_passes": 0,
+            "builder_dao_profile_selftest_failures": 0,
+            "builder_dao_merge_receipts": 0,
+            "builder_dao_typed_merge_receipts": 0,
+            "builder_dao_trial_summaries": 0,
+            "builder_dao_non_typed_authority_grants": 0,
         })
         self.assertEqual(report["raw_claims_detected_count"], 2)
         self.assertEqual(report["blocked_authority_claim_count"], 2)

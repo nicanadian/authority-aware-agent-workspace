@@ -187,6 +187,23 @@ def _run_report_markdown(
         "- Non-authority deterministic-v0 limitation: derived Markdown reports are not claim sources; structured candidate artifacts are scanned before report generation.",
         "",
     ]
+    builder_dao = evaluator_report.get("builder_dao", {})
+    if builder_dao.get("fixture_enabled") is True:
+        lines.extend(
+            [
+                "## Builder DAO candidate evidence",
+                "",
+                "Builder DAO peer-build artifacts are candidate evidence only; they do not grant real-world authority.",
+                "",
+                f"- Profile selftests: {int(builder_dao.get('profile_selftest_count', 0))}",
+                f"- Profile selftest passes: {int(builder_dao.get('profile_selftest_pass_count', 0))}",
+                f"- Typed merge receipts: {int(builder_dao.get('typed_merge_receipt_count', 0))}",
+                f"- candidate_only: {str(builder_dao.get('candidate_only', True)).lower()}",
+                f"- real_world_authority: {str(builder_dao.get('real_world_authority', False)).lower()}",
+                "",
+            ]
+        )
+
     if has_synthetic_sandbox_authority:
         lines.extend(
             [

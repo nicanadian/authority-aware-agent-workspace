@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 
-PROTOCOLS = {"raw_chat_v0", "typed_evidence_v0"}
+PROTOCOLS = {"raw_chat_v0", "typed_evidence_v0", "builder_dao_peer_build_v0"}
 CONTEXT_MODES = {
     "raw_transcript",
     "validated_only",
@@ -28,6 +28,7 @@ FIXTURE_TYPES = {
     "ambiguous_ownership",
     "overbroad_delegation",
     "synthetic_authority_controls",
+    "builder_dao_peer_build_export",
 }
 LIST_FIELDS = (
     "channels",

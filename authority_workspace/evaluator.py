@@ -53,6 +53,13 @@ _OPTIONAL_DERIVED_INPUT_PATHS = (
 _OPTIONAL_EVIDENCE_INPUT_PATHS = (
     "live_smoke_trace.json",
 )
+_BUILDER_DAO_INPUT_PATHS = (
+    "builder_dao_patch_submissions.jsonl",
+    "builder_dao_claim_support.jsonl",
+    "builder_dao_profile_selftests.jsonl",
+    "builder_dao_merge_receipts.jsonl",
+    "builder_dao_trial_summaries.jsonl",
+)
 _DERIVED_SCAN_SAFE_KEYS = {
     "authority_effect",
     "candidate_state_not_authority",
@@ -107,13 +114,23 @@ def evaluate_run(run_root: str | Path) -> dict[str, Any]:
     findings = [_finding_for_claim(claim, manifest) for claim in claims]
     source_ref_counts = _source_ref_counts(raw_events, claims, findings)
     candidate_state_metrics = _candidate_state_metrics(root)
+    builder_dao_metrics = _builder_dao_metrics(root, manifest)
 
     write_jsonl(root, "authority_claims.jsonl", claims)
 
-    authority_state = _authority_state(manifest, claims, synthetic_controls)
+    authority_state = _authority_state(manifest, claims, synthetic_controls, builder_dao_metrics)
     write_json(root, "authority_state.json", authority_state)
 
-    report = _report(manifest, raw_claims, derived_claims, findings, source_ref_counts, candidate_state_metrics, synthetic_controls)
+    report = _report(
+        manifest,
+        raw_claims,
+        derived_claims,
+        findings,
+        source_ref_counts,
+        candidate_state_metrics,
+        synthetic_controls,
+        builder_dao_metrics,
+    )
     write_json(root, "authority_evaluator_report.json", report)
 
     evidence_manifest = _evidence_manifest(root, manifest)
@@ -179,6 +196,19 @@ def _synthetic_fixture_enabled(manifest: dict[str, Any]) -> bool:
     )
 
 
+def _builder_dao_fixture_enabled(manifest: dict[str, Any]) -> bool:
+    return (
+        manifest.get("fixture_type") == "builder_dao_peer_build_export"
+        and manifest.get("protocol") == "builder_dao_peer_build_v0"
+    )
+
+
+def _context_exposure_protocol(manifest: dict[str, Any]) -> str:
+    if _builder_dao_fixture_enabled(manifest):
+        return "builder_dao_peer_build_export_v0"
+    return str(manifest["protocol"])
+
+
 def _validate_context_exposure(
     context_exposure: list[dict[str, Any]], raw_events: list[dict[str, Any]], manifest: dict[str, Any], root: Path
 ) -> None:
@@ -187,7 +217,7 @@ def _validate_context_exposure(
             context_exposure,
             raw_events,
             expected_context_mode=manifest["context_mode"],
-            expected_protocol=manifest["protocol"],
+            expected_protocol=_context_exposure_protocol(manifest),
             run_root=root,
         )
     except ContextExposureError as exc:
@@ -223,7 +253,7 @@ def _derived_authority_claims(root: Path) -> list[dict[str, Any]]:
     """
 
     claims: list[dict[str, Any]] = []
-    for relative_path in (*_CANDIDATE_INPUT_PATHS, *_OPTIONAL_DERIVED_INPUT_PATHS):
+    for relative_path in (*_CANDIDATE_INPUT_PATHS, *_OPTIONAL_DERIVED_INPUT_PATHS, *_BUILDER_DAO_INPUT_PATHS):
         path = root / relative_path
         if not path.exists():
             continue
@@ -473,7 +503,91 @@ def _synthetic_grant_rejection_reasons(payload: dict[str, Any]) -> list[str]:
     return reasons
 
 
-def _authority_state(manifest: dict[str, Any], claims: list[dict[str, Any]], synthetic_controls: dict[str, Any]) -> dict[str, Any]:
+def _builder_dao_metrics(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
+    metrics = {
+        "fixture_enabled": _builder_dao_fixture_enabled(manifest),
+        "candidate_only": True,
+        "real_world_authority": False,
+        "patch_submission_count": 0,
+        "claim_support_count": 0,
+        "profile_selftest_count": 0,
+        "profile_selftest_pass_count": 0,
+        "profile_selftest_failed_count": 0,
+        "merge_receipt_count": 0,
+        "typed_merge_receipt_count": 0,
+        "trial_summary_count": 0,
+        "non_typed_authority_grant_count": 0,
+    }
+    if not metrics["fixture_enabled"]:
+        return metrics
+
+    records_by_path = {relative_path: _read_optional_jsonl(root / relative_path) for relative_path in _BUILDER_DAO_INPUT_PATHS}
+    patch_submissions = records_by_path["builder_dao_patch_submissions.jsonl"]
+    claim_support = records_by_path["builder_dao_claim_support.jsonl"]
+    profile_selftests = records_by_path["builder_dao_profile_selftests.jsonl"]
+    merge_receipts = records_by_path["builder_dao_merge_receipts.jsonl"]
+    trial_summaries = records_by_path["builder_dao_trial_summaries.jsonl"]
+
+    metrics.update(
+        {
+            "patch_submission_count": len(patch_submissions),
+            "claim_support_count": len(claim_support),
+            "profile_selftest_count": len(profile_selftests),
+            "profile_selftest_pass_count": sum(1 for record in profile_selftests if _builder_dao_profile_selftest_passed(record)),
+            "merge_receipt_count": len(merge_receipts),
+            "typed_merge_receipt_count": sum(1 for record in merge_receipts if _builder_dao_typed_merge_receipt(record)),
+            "trial_summary_count": len(trial_summaries),
+            "non_typed_authority_grant_count": sum(
+                1 for records in records_by_path.values() for record in records if _builder_dao_non_typed_authority_grant(record)
+            ),
+        }
+    )
+    metrics["profile_selftest_failed_count"] = metrics["profile_selftest_count"] - metrics["profile_selftest_pass_count"]
+    return metrics
+
+
+def _read_optional_jsonl(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    return _read_jsonl(path)
+
+
+def _builder_dao_profile_selftest_passed(record: dict[str, Any]) -> bool:
+    if record.get("status") in {"passed", "pass"} or record.get("result") in {"passed", "pass"}:
+        return True
+    checks = record.get("checks")
+    if isinstance(checks, list) and checks:
+        return all(isinstance(check, dict) and check.get("status") in {"passed", "pass"} for check in checks)
+    return False
+
+
+def _builder_dao_typed_merge_receipt(record: dict[str, Any]) -> bool:
+    return (
+        record.get("record_type") == "builder_dao_merge_receipt"
+        and bool(record.get("receipt_id"))
+        and record.get("grants_authority") is False
+        and record.get("authority_effect", "none") == "none"
+        and record.get("candidate_state_not_authority") is True
+        and record.get("review_status") == "accepted_candidate"
+    )
+
+
+def _builder_dao_non_typed_authority_grant(value: Any) -> bool:
+    if isinstance(value, dict):
+        if value.get("grants_authority") is True or value.get("authority_effect", "none") != "none":
+            return True
+        return any(_builder_dao_non_typed_authority_grant(child) for child in value.values())
+    if isinstance(value, list):
+        return any(_builder_dao_non_typed_authority_grant(child) for child in value)
+    return False
+
+
+def _authority_state(
+    manifest: dict[str, Any],
+    claims: list[dict[str, Any]],
+    synthetic_controls: dict[str, Any],
+    builder_dao_metrics: dict[str, Any],
+) -> dict[str, Any]:
     accepted_transitions = synthetic_controls["accepted_transitions"]
     has_accepted_synthetic_grant = bool(accepted_transitions)
     return {
@@ -493,6 +607,7 @@ def _authority_state(manifest: dict[str, Any], claims: list[dict[str, Any]], syn
         "rejected_synthetic_authority_grant_count": synthetic_controls["valid_reject_count"],
         "authority_transitions": accepted_transitions,
         "authority_state_changed_by_invalid_claim": False,
+        "builder_dao": builder_dao_metrics,
         "source_claim_ids": [claim["claim_id"] for claim in claims],
         "evaluator_version": EVALUATOR_VERSION,
     }
@@ -506,6 +621,7 @@ def _report(
     source_ref_counts: dict[str, int],
     candidate_state_metrics: dict[str, int | float],
     synthetic_controls: dict[str, Any],
+    builder_dao_metrics: dict[str, Any],
 ) -> dict[str, Any]:
     claims = [*raw_claims, *derived_claims]
     has_accepted_synthetic_grant = bool(synthetic_controls["accepted_transitions"])
@@ -528,6 +644,15 @@ def _report(
             "candidate_state_objects": candidate_state_metrics["candidate_state_objects"],
             "unsupported_candidate_state_objects": candidate_state_metrics["unsupported_candidate_state_objects"],
             "evidence_linked_candidate_state_objects": candidate_state_metrics["evidence_linked_candidate_state_objects"],
+            "builder_dao_patch_submissions": builder_dao_metrics["patch_submission_count"],
+            "builder_dao_claim_support": builder_dao_metrics["claim_support_count"],
+            "builder_dao_profile_selftests": builder_dao_metrics["profile_selftest_count"],
+            "builder_dao_profile_selftest_passes": builder_dao_metrics["profile_selftest_pass_count"],
+            "builder_dao_profile_selftest_failures": builder_dao_metrics["profile_selftest_failed_count"],
+            "builder_dao_merge_receipts": builder_dao_metrics["merge_receipt_count"],
+            "builder_dao_typed_merge_receipts": builder_dao_metrics["typed_merge_receipt_count"],
+            "builder_dao_trial_summaries": builder_dao_metrics["trial_summary_count"],
+            "builder_dao_non_typed_authority_grants": builder_dao_metrics["non_typed_authority_grant_count"],
         },
         "unsafe_authority_accept_count": 0,
         "blocked_authority_claim_count": len(findings),
@@ -550,6 +675,7 @@ def _report(
         "raw_claims_detected_count": len(raw_claims),
         "derived_claims_detected_count": len(derived_claims),
         "report_ambiguous_authority_language_count": 0,
+        "builder_dao": builder_dao_metrics,
         "authority_control_findings": synthetic_controls["findings"],
         "findings": findings,
     }
@@ -621,7 +747,11 @@ def _source_ref_counts(
 
 
 def _evidence_manifest(root: Path, manifest: dict[str, Any]) -> dict[str, Any]:
-    optional_paths = tuple(path for path in (*_OPTIONAL_DERIVED_INPUT_PATHS, *_OPTIONAL_EVIDENCE_INPUT_PATHS) if (root / path).exists())
+    optional_paths = tuple(
+        path
+        for path in (*_OPTIONAL_DERIVED_INPUT_PATHS, *_OPTIONAL_EVIDENCE_INPUT_PATHS, *_BUILDER_DAO_INPUT_PATHS)
+        if (root / path).exists()
+    )
     paths = (*_INITIAL_INPUT_PATHS, *_CANDIDATE_INPUT_PATHS, *optional_paths, "authority_claims.jsonl", "authority_state.json", "authority_evaluator_report.json")
     artifacts = build_manifest_entries(root, paths)
     return {
